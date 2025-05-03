@@ -17,9 +17,30 @@ const GameTable: React.FC<GameTableProps> = ({
   onDrawCard,
   isCurrentPlayerTurn
 }) => {
+  // Logs para depuración
+  console.log('GameTable - Estado actual:', {
+    gameState: gameState?.id,
+    currentPlayerId: currentPlayer?.id,
+    playersCount: gameState?.players?.length,
+    isCurrentPlayerTurn
+  });
+
   if (!gameState || !currentPlayer) {
+    console.log('GameTable - Retornando null por falta de datos:', {
+      hasGameState: !!gameState,
+      hasCurrentPlayer: !!currentPlayer
+    });
     return null;
   }
+
+  // Filtrar jugadores de forma segura
+  const otherPlayers = gameState.players.filter(p => {
+    const isValidPlayer = p && p.id && p.id !== currentPlayer.id;
+    if (!isValidPlayer) {
+      console.log('GameTable - Jugador inválido encontrado:', p);
+    }
+    return isValidPlayer;
+  });
 
   return (
     <div className="relative w-full h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)] bg-green-800 shadow-inner">
@@ -94,16 +115,18 @@ const GameTable: React.FC<GameTableProps> = ({
 
       {/* Información de otros jugadores */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-4 px-2 sm:px-4 flex-wrap">
-        {gameState.players
-          .filter(p => p && p.id && p.id !== currentPlayer.id)
-          .map(player => (
+        {otherPlayers.map(player => {
+          const playerIndex = gameState.players.findIndex(p => p && p.id === player.id);
+          const isCurrentTurn = gameState.currentPlayerIndex === playerIndex;
+          
+          return (
             <motion.div
               key={player.id}
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               className={`
                 px-2 sm:px-4 py-1 sm:py-2 rounded-lg
-                ${gameState.currentPlayerIndex === gameState.players.findIndex(p => p && p.id === player.id) ? 'bg-yellow-500' : 'bg-gray-800'}
+                ${isCurrentTurn ? 'bg-yellow-500' : 'bg-gray-800'}
                 text-white shadow-lg
               `}
             >
@@ -112,7 +135,8 @@ const GameTable: React.FC<GameTableProps> = ({
                 <div className="text-xs sm:text-sm">{player.cards.length} cartas</div>
               </div>
             </motion.div>
-          ))}
+          );
+        })}
       </div>
     </div>
   );
