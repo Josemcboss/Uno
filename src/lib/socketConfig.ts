@@ -497,8 +497,18 @@ export class GameClient {
         })
       });
 
-      return response.ok;
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Error enviando mensaje:', data);
+        return false;
+      }
+      
+      if (data.message) {
+        this.events.onChatMessage?.(message);
+      }
+      return true;
     } catch (error) {
+      console.error('Error en chat:', error);
       return false;
     }
   }

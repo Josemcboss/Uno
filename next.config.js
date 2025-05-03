@@ -11,11 +11,7 @@ const nextConfig = {
   },
   // Añadir optimizaciones
   poweredByHeader: false,
-  reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: false,
-    dirs: ['src']
-  }
+  reactStrictMode: true
 };
 
 module.exports = nextConfig; 

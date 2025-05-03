@@ -6,5 +6,11 @@
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_API_URL": "production-url-here"
-  }
+  },
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ]
 } 
