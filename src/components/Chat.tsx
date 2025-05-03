@@ -20,7 +20,6 @@ const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
 
   useEffect(() => {
     if (socket) {
-      // Escuchar mensajes del servidor
       socket.onChatMessage = (message: Message) => {
         setMessages(prev => [...prev, message]);
       };
@@ -42,7 +41,6 @@ const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
       timestamp: Date.now(),
     };
 
-    // Enviar mensaje al servidor
     socket.sendChatMessage(message);
     setNewMessage('');
   };
