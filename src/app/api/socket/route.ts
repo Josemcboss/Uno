@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import type { GameState } from '../../../types/game';
 import { createGame, dealInitialCards, drawCard, playCard } from '../../../lib/game';
 import { getGame, setGame } from '../../../lib/redis';
 
