@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatProps {
   playerName: string;
-  socket: GameClient;
+  socket: GameClient | null;
 }
 
 const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
@@ -16,6 +16,8 @@ const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    if (!socket) return;
+
     // Suscribirse a los mensajes del chat
     socket.onChatMessage = (message: Message) => {
       setMessages(prevMessages => [...prevMessages, message]);
@@ -39,7 +41,7 @@ const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !socket) return;
 
     const message: Message = {
       id: crypto.randomUUID(),

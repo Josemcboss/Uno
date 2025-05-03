@@ -67,12 +67,6 @@ export default function Home() {
   }, [isConnected, isConnecting, gameState]);
 
   useEffect(() => {
-    if (gameState?.players) {
-      // Lógica específica para los jugadores si es necesaria
-    }
-  }, [gameState?.players]);
-
-  useEffect(() => {
     SoundEffects.initialize();
     Achievements.initialize();
   }, []);
