@@ -64,37 +64,33 @@ export default function Home() {
       if (currentPlayer.name.startsWith('IA-')) {
         console.log('Es el turno de la IA:', currentPlayer.name, 'Índice:', currentPlayerIndex);
         
-        try {
-          // Verificación adicional para asegurarnos de que el estado sea reciente
-          const freshGameState = await gameClient?.getGameState(gameState.id);
-          if (!freshGameState) {
-            console.log('No se pudo obtener el estado fresco del juego');
-            return;
-          }
-          
-          // Verificar que siga siendo el turno de la IA
-          if (freshGameState.currentPlayerIndex !== currentPlayerIndex) {
-            console.log('El turno cambió antes de que la IA pudiera jugar');
-            return;
-          }
-          
-          // Pequeña pausa para evitar colisiones con otros eventos
-          if (isMounted) {
-            aiTurnTimeout = setTimeout(async () => {
+        // Los jugadores AI tienen su propia lógica para jugar
+        if (isMounted) {
+          aiTurnTimeout = setTimeout(async () => {
+            try {
               if (!isMounted || !gameClient) return;
               
-              const refreshedPlayer = freshGameState.players.find(p => p.id === currentPlayer.id);
-              if (!refreshedPlayer) {
-                console.log('No se pudo encontrar el jugador IA en el estado actualizado');
-                return;
-              }
+              // Usamos el estado del juego directamente sin verificaciones adicionales
+              // que podrían fallar en Vercel
+              await AIPlayer.playTurn(gameState, currentPlayer, gameClient);
               
-              // Ejecutar el turno de la IA
-              await AIPlayer.playTurn(freshGameState, refreshedPlayer, gameClient);
-            }, 500);
-          }
-        } catch (error) {
-          console.error('Error durante el turno de la IA:', error);
+              // Reintentamos si vemos que la IA no ha jugado después de 3 segundos
+              setTimeout(async () => {
+                if (!gameClient) return;
+                // Verificar si sigue siendo el turno de la IA después de 3 segundos
+                const refreshedState = await gameClient.getGameState(gameState.id);
+                if (refreshedState && 
+                    refreshedState.currentPlayerIndex === currentPlayerIndex &&
+                    refreshedState.status === 'playing') {
+                  console.log('IA no jugó, reintentando...');
+                  await AIPlayer.playTurn(refreshedState, currentPlayer, gameClient);
+                }
+              }, 3000);
+              
+            } catch (error) {
+              console.error('Error al jugar el turno de la IA:', error);
+            }
+          }, 1000);
         }
       }
     };

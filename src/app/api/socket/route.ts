@@ -407,6 +407,31 @@ export async function POST(req: Request) {
           { status: 200 }
         );
 
+      case 'get_game_state':
+        if (!gameId) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Missing game ID' }),
+            { status: 400 }
+          );
+        }
+        const gameState = await getGame(gameId);
+        if (!gameState) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Game not found' }),
+            { status: 404 }
+          );
+        }
+        return new NextResponse(
+          JSON.stringify({ game: gameState }),
+          { 
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+          }
+        );
+
       default:
         return new NextResponse(
           JSON.stringify({ error: 'Invalid action' }),

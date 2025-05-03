@@ -10,141 +10,61 @@ export class AIPlayer {
         aiName: aiPlayer.name,
         cardsCount: aiPlayer.cards.length,
         currentPlayerIdx: gameState.currentPlayerIndex,
-        aiPlayerIdx: gameState.players.findIndex(p => p.id === aiPlayer.id)
       });
 
-      // Verificación adicional del turno de la IA
-      const aiPlayerIndex = gameState.players.findIndex(p => p.id === aiPlayer.id);
-      if (aiPlayerIndex !== gameState.currentPlayerIndex) {
-        console.log('No es el turno de la IA - verificación inicial fallida');
-        return;
-      }
-
-      // Primera pausa para simular "pensamiento"
+      // Pausa breve para simular "pensamiento"
       await new Promise(resolve => setTimeout(resolve, this.DELAY));
 
-      // Verificar de nuevo el estado del juego para asegurarnos de que no haya cambiado
-      const refreshedGameState = await gameClient.getGameState(gameState.id);
-      if (!refreshedGameState) {
-        console.log('No se pudo obtener el estado actualizado del juego');
-        return;
-      }
-
-      // Verificar que siga siendo el turno de la IA
-      const updatedAiPlayerIndex = refreshedGameState.players.findIndex(p => p.id === aiPlayer.id);
-      if (updatedAiPlayerIndex !== refreshedGameState.currentPlayerIndex) {
-        console.log('No es el turno de la IA - verificación posterior fallida');
-        return;
-      }
-
-      const refreshedAiPlayer = refreshedGameState.players[updatedAiPlayerIndex];
-      const topCard = refreshedGameState.discardPile[refreshedGameState.discardPile.length - 1];
-      
-      // Determinar cartas jugables
-      const playableCards = refreshedAiPlayer.cards.filter(card => 
+      // Obtener la carta superior y determinar jugadas posibles
+      const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+      const playableCards = aiPlayer.cards.filter(card => 
         this.canPlayCard(card, topCard)
       );
 
-      console.log('Cartas jugables de la IA:', {
-        total: refreshedAiPlayer.cards.length,
-        playable: playableCards.length,
-        topCard: `${topCard.color || 'black'} ${topCard.type}${topCard.value !== undefined ? ' ' + topCard.value : ''}`
-      });
+      console.log('Cartas jugables:', playableCards.length, 'de', aiPlayer.cards.length);
 
       // Si no hay cartas jugables, robar
       if (playableCards.length === 0) {
-        console.log('IA necesita robar carta');
-        
-        // Verificar una vez más que siga siendo nuestro turno
-        const preDrawGameState = await gameClient.getGameState(gameState.id);
-        if (!preDrawGameState || preDrawGameState.currentPlayerIndex !== updatedAiPlayerIndex) {
-          console.log('Ya no es el turno de la IA antes de robar');
-          return;
-        }
-        
+        console.log('IA roba carta');
         await gameClient.drawCard(gameState.id, aiPlayer.id);
-        console.log('IA ha robado una carta');
-        
-        // Esperar un momento para que se actualice el estado del juego
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Verificar si la carta robada se puede jugar
-        const postDrawGameState = await gameClient.getGameState(gameState.id);
-        if (!postDrawGameState) {
-          console.log('No se pudo obtener el estado después de robar');
-          return;
-        }
-
-        // Verificar si todavía es el turno de la IA después de robar
-        const postDrawAiIndex = postDrawGameState.players.findIndex(p => p.id === aiPlayer.id);
-        if (postDrawAiIndex !== postDrawGameState.currentPlayerIndex) {
-          console.log('Ya no es el turno de la IA después de robar');
-          return;
-        }
-
-        const postDrawAiPlayer = postDrawGameState.players[postDrawAiIndex];
-        const lastDrawnCard = postDrawAiPlayer.cards[postDrawAiPlayer.cards.length - 1];
-        
-        // Verificar si la carta robada se puede jugar
-        if (lastDrawnCard && this.canPlayCard(lastDrawnCard, topCard)) {
-          console.log('IA puede jugar la carta recién robada');
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          // Verificar una vez más antes de jugar
-          const finalCheckState = await gameClient.getGameState(gameState.id);
-          if (!finalCheckState || finalCheckState.currentPlayerIndex !== postDrawAiIndex) {
-            console.log('Ya no es el turno de la IA antes de jugar carta robada');
-            return;
-          }
-          
-          if (lastDrawnCard.type === 'wild' || lastDrawnCard.type === 'wildDraw4') {
-            const color = this.getMostFrequentColor(postDrawAiPlayer.cards);
-            console.log(`IA jugando carta robada wild con color ${color}`);
-            await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard, color);
-          } else {
-            console.log('IA jugando carta robada normal');
-            await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard);
-          }
-          
-          // Verificar si hay que llamar UNO
-          if (postDrawAiPlayer.cards.length === 2) {
-            await gameClient.callUno(gameState.id, aiPlayer.id);
-          }
-        } else {
-          console.log('IA no puede jugar la carta robada, pasando turno');
-        }
         return;
+      }
+
+      // Si la IA va a quedarse con una carta (tiene 2 ahora), llamar UNO primero
+      if (aiPlayer.cards.length === 2 && !aiPlayer.calledUno) {
+        console.log('IA llama UNO preventivamente');
+        await gameClient.callUno(gameState.id, aiPlayer.id);
+        // Pequeña pausa para asegurar que el servidor procese la llamada a UNO
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       // Elegir la mejor carta para jugar
-      const cardToPlay = this.chooseBestCard(playableCards, refreshedAiPlayer.cards);
-      console.log('IA eligió jugar:', {
-        card: `${cardToPlay.color || 'black'} ${cardToPlay.type}${cardToPlay.value !== undefined ? ' ' + cardToPlay.value : ''}`
-      });
+      const cardToPlay = this.chooseBestCard(playableCards, aiPlayer.cards);
+      console.log('IA jugará:', 
+        cardToPlay.type === 'number' 
+          ? `${cardToPlay.color} ${cardToPlay.value}` 
+          : `${cardToPlay.color || 'black'} ${cardToPlay.type}`
+      );
       
-      // Verificar de nuevo que siga siendo nuestro turno antes de jugar
-      const finalGameState = await gameClient.getGameState(gameState.id);
-      if (!finalGameState || finalGameState.currentPlayerIndex !== updatedAiPlayerIndex) {
-        console.log('Ya no es el turno de la IA antes de jugar carta elegida');
-        return;
-      }
+      // Pequeña pausa antes de jugar
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Si es una carta wild, elegir el color más frecuente
       if (cardToPlay.type === 'wild' || cardToPlay.type === 'wildDraw4') {
-        const color = this.getMostFrequentColor(refreshedAiPlayer.cards);
-        console.log('IA eligiendo color para carta wild:', color);
+        const color = this.getMostFrequentColor(aiPlayer.cards);
+        console.log('IA elige color:', color);
         await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay, color);
       } else {
         await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay);
       }
 
-      // Llamar UNO si corresponde
-      if (refreshedAiPlayer.cards.length === 2) {
-        console.log('IA llamando UNO');
+      // Verificar si después de jugar la carta quedaría con una sola carta, y no ha llamado UNO aún
+      if (aiPlayer.cards.length === 2 && !aiPlayer.calledUno) {
+        console.log('IA llama UNO después de jugar');
         await gameClient.callUno(gameState.id, aiPlayer.id);
       }
       
-      console.log('IA completó su turno con éxito');
+      console.log('IA completó su turno');
     } catch (error) {
       console.error('Error en el turno de la IA:', error);
     }
