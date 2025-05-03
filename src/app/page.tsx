@@ -20,7 +20,6 @@ export default function Home() {
   const [showColorSelector, setShowColorSelector] = useState(false);
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const currentPlayer = React.useMemo(() => 
@@ -66,15 +65,12 @@ export default function Home() {
 
   const createGame = async () => {
     if (!playerName || !gameClient) return;
-    setIsLoading(true);
     setError(null);
     try {
       localStorage.setItem('playerName', playerName);
       await gameClient.createGame(playerName);
     } catch (err) {
       setError('Error al crear el juego. Por favor, intenta de nuevo.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -87,7 +83,7 @@ export default function Home() {
   const playCard = async (card: CardType) => {
     if (!gameState || !playerId || !gameClient) return;
 
-    if (card.type === 'wild' || card.type === 'wild4') {
+    if (card.type === 'wild' || card.type === 'wildDraw4') {
       setSelectedCard(card);
       setShowColorSelector(true);
       return;
@@ -131,6 +127,7 @@ export default function Home() {
               <button
                 onClick={createGame}
                 className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+                disabled={!playerName}
               >
                 Crear Juego
               </button>
@@ -145,11 +142,15 @@ export default function Home() {
                 <button
                   onClick={joinGame}
                   className="bg-green-500 text-white px-4 rounded hover:bg-green-600 transition-colors"
+                  disabled={!gameId || !playerName}
                 >
                   Unirse
                 </button>
               </div>
             </div>
+            {error && (
+              <p className="text-red-500 mt-4 text-center">{error}</p>
+            )}
           </motion.div>
         ) : (
           <div className="relative min-h-screen">
@@ -166,7 +167,7 @@ export default function Home() {
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     className={`${
-                      player.isCurrentTurn ? 'text-yellow-300' : ''
+                      gameState.currentPlayerIndex === gameState.players.indexOf(player) ? 'text-yellow-300' : ''
                     }`}
                   >
                     {player.name} ({player.cards.length} cartas)
@@ -182,7 +183,7 @@ export default function Home() {
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring' }}
               >
-                <Card card={gameState.currentCard} />
+                {gameState.lastCard && <Card card={gameState.lastCard} />}
               </motion.div>
             </div>
 
@@ -191,14 +192,14 @@ export default function Home() {
                 <PlayerHand
                   cards={currentPlayer.cards}
                   onCardClick={playCard}
-                  isCurrentTurn={currentPlayer.isCurrentTurn}
+                  isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
                 />
-                {currentPlayer.isCurrentTurn && (
+                {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
                   <motion.button
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
                     onClick={drawCard}
+                    className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
                   >
                     Robar Carta
                   </motion.button>
@@ -214,30 +215,6 @@ export default function Home() {
 
             {showColorSelector && (
               <ColorSelector onColorSelect={handleColorSelect} />
-            )}
-
-            {gameState.status === 'finished' && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-              >
-                <div className="bg-white p-8 rounded-xl text-center">
-                  <h2 className="text-2xl font-bold mb-4">
-                    ¡Juego Terminado!
-                  </h2>
-                  <p>
-                    Ganador:{' '}
-                    {gameState.players.find((p: Player) => p.id === gameState.winner)?.name}
-                  </p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                  >
-                    Jugar de nuevo
-                  </button>
-                </div>
-              </motion.div>
             )}
           </div>
         )}

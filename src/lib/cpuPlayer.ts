@@ -1,12 +1,12 @@
 import { Card, GameState, CardColor } from '../types/game';
-import { isValidPlay, getValidCards } from './gameLogic';
+import { getValidCards } from './gameLogic';
 
 export class CPUPlayer {
   private getRandomDelay(): number {
     return Math.random() * 1000 + 1000; // Delay entre 1-2 segundos
   }
 
-  private selectBestCard(validCards: Card[], currentCard: Card): Card {
+  private selectBestCard(validCards: Card[]): Card {
     // Priorizar cartas especiales
     const specialCards = validCards.filter(card => card.type !== 'number');
     if (specialCards.length > 0) {
@@ -46,18 +46,18 @@ export class CPUPlayer {
     await new Promise(resolve => setTimeout(resolve, this.getRandomDelay()));
 
     const player = gameState.players.find(p => p.id === playerId);
-    if (!player) return { action: 'draw' };
+    if (!player || !gameState.lastCard) return { action: 'draw' };
 
-    const validCards = getValidCards(player.cards, gameState.currentCard);
+    const validCards = getValidCards(player.cards, gameState.lastCard);
 
     if (validCards.length === 0) {
       return { action: 'draw' };
     }
 
-    const selectedCard = this.selectBestCard(validCards, gameState.currentCard);
+    const selectedCard = this.selectBestCard(validCards);
 
     // Si es una carta wild, seleccionar el color más frecuente en la mano
-    if (selectedCard.type === 'wild' || selectedCard.type === 'wild4') {
+    if (selectedCard.type === 'wild' || selectedCard.type === 'wildDraw4') {
       const selectedColor = this.getMostFrequentColor(player.cards);
       return {
         action: 'play',

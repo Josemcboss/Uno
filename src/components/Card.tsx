@@ -2,10 +2,7 @@ import React from 'react';
 import { Card as CardType } from '../types/game';
 import { 
   GiCardRandom, 
-  GiCardPlay, 
   GiCardDraw, 
-  GiCardDiscard,
-  GiCardPick,
   GiCardJoker
 } from 'react-icons/gi';
 import { IoIosRefresh } from 'react-icons/io';
@@ -28,7 +25,7 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false }) => {
         return <GiCardDraw className="text-4xl" />;
       case 'wild':
         return <GiCardRandom className="text-4xl" />;
-      case 'wild4':
+      case 'wildDraw4':
         return <GiCardJoker className="text-4xl" />;
       default:
         return null;

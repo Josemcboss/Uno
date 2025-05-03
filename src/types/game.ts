@@ -1,5 +1,5 @@
 export type CardColor = 'red' | 'blue' | 'green' | 'yellow' | 'black';
-export type CardType = 'number' | 'skip' | 'reverse' | 'draw2' | 'wild' | 'wild4';
+export type CardType = 'number' | 'skip' | 'reverse' | 'draw2' | 'wild' | 'wildDraw4';
 
 export interface Card {
   id: string;
@@ -12,17 +12,17 @@ export interface Player {
   id: string;
   name: string;
   cards: Card[];
-  isCurrentTurn: boolean;
+  isHost: boolean;
 }
 
 export interface GameState {
   id: string;
   players: Player[];
-  currentCard: Card;
-  direction: 'clockwise' | 'counterclockwise';
-  currentColor: CardColor;
-  drawPile: Card[];
+  currentPlayerIndex: number;
+  deck: Card[];
   discardPile: Card[];
+  direction: 1 | -1;
+  lastCard: Card | null;
   status: 'waiting' | 'playing' | 'finished';
-  winner?: string;
+  winner: string | null;
 } 

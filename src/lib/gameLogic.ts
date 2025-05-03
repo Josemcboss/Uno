@@ -47,7 +47,7 @@ export const createDeck = (): Card[] => {
     deck.push({
       id: uuidv4(),
       color: 'black',
-      type: 'wild4'
+      type: 'wildDraw4'
     });
   }
 
@@ -63,64 +63,65 @@ export const shuffleDeck = (deck: Card[]): Card[] => {
   return newDeck;
 };
 
-export const dealCards = (deck: Card[], numPlayers: number): {
+export const dealCards = (deck: Card[]): {
   players: Player[];
   remainingDeck: Card[];
-  currentCard: Card;
+  lastCard: Card;
 } => {
   const players: Player[] = [];
   const newDeck = [...deck];
 
   // Dar 7 cartas a cada jugador
-  for (let i = 0; i < numPlayers; i++) {
+  for (let i = 0; i < 2; i++) {
     const cards = newDeck.splice(0, 7);
     players.push({
       id: uuidv4(),
       name: `Player ${i + 1}`,
       cards,
-      isCurrentTurn: i === 0
+      isHost: i === 0
     });
   }
 
-  // Tomar la primera carta que no sea wild o wild4 como carta inicial
-  let currentCard: Card;
-  let currentCardIndex = newDeck.findIndex(
-    card => card.type !== 'wild' && card.type !== 'wild4'
+  // Tomar la primera carta que no sea wild o wildDraw4 como carta inicial
+  let lastCard: Card;
+  let lastCardIndex = newDeck.findIndex(
+    card => card.type !== 'wild' && card.type !== 'wildDraw4'
   );
-  currentCard = newDeck.splice(currentCardIndex, 1)[0];
+  lastCard = newDeck.splice(lastCardIndex, 1)[0];
 
   return {
     players,
     remainingDeck: newDeck,
-    currentCard
+    lastCard
   };
 };
 
-export const isValidPlay = (card: Card, currentCard: Card): boolean => {
-  // Wild cards can always be played
-  if (card.type === 'wild' || card.type === 'wild4') {
-    return true;
-  }
+export function isValidPlay(card: Card, lastCard: Card): boolean {
+  if (card.color === 'black') return true; // Comodines siempre son válidos
+  if (card.color === lastCard.color) return true; // Mismo color
+  if (card.type === 'number' && lastCard.type === 'number' && card.value === lastCard.value) return true; // Mismo número
+  if (card.type === lastCard.type) return true; // Mismo tipo de carta especial
+  return false;
+}
 
-  // Match color or type/value
-  return (
-    card.color === currentCard.color ||
-    (card.type === currentCard.type && card.type === 'number' && card.value === currentCard.value) ||
-    card.type === currentCard.type
-  );
-};
+export function getValidCards(cards: Card[], lastCard: Card): Card[] {
+  return cards.filter(card => isValidPlay(card, lastCard));
+}
 
-export const createNewGame = (numPlayers: number): GameState => {
+export const createNewGame = (hostId: string, hostName: string): GameState => {
   const deck = createDeck();
-  const { players, remainingDeck, currentCard } = dealCards(deck, numPlayers);
+  const { players, remainingDeck, lastCard } = dealCards(deck);
 
   return {
     id: uuidv4(),
     players,
-    currentCard,
+    currentPlayerIndex: 0,
     deck: remainingDeck,
-    direction: 'clockwise',
-    status: 'waiting'
+    discardPile: [lastCard],
+    direction: 1,
+    lastCard,
+    status: 'waiting',
+    winner: null
   };
 };
 
@@ -133,7 +134,7 @@ export interface GameAction {
 
 export const handleSpecialCard = (game: GameState, action: GameAction): GameState => {
   const currentPlayerIndex = game.players.findIndex(p => p.id === action.playerId);
-  const nextPlayerIndex = game.direction === 'clockwise' 
+  const nextPlayerIndex = game.direction === 1
     ? (currentPlayerIndex + 1) % game.players.length 
     : (currentPlayerIndex - 1 + game.players.length) % game.players.length;
 
@@ -142,18 +143,13 @@ export const handleSpecialCard = (game: GameState, action: GameAction): GameStat
   switch (action.card?.type) {
     case 'skip':
       // Salta al siguiente jugador
-      const skipNextPlayer = game.direction === 'clockwise'
-        ? (nextPlayerIndex + 1) % game.players.length
-        : (nextPlayerIndex - 1 + game.players.length) % game.players.length;
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[skipNextPlayer].isCurrentTurn = true;
+      updatedGame.currentPlayerIndex = (nextPlayerIndex + game.direction + game.players.length) % game.players.length;
       break;
 
     case 'reverse':
       // Cambia la dirección del juego
-      updatedGame.direction = game.direction === 'clockwise' ? 'counterclockwise' : 'clockwise';
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[nextPlayerIndex].isCurrentTurn = true;
+      updatedGame.direction *= -1;
+      updatedGame.currentPlayerIndex = nextPlayerIndex;
       break;
 
     case 'draw2':
@@ -161,43 +157,35 @@ export const handleSpecialCard = (game: GameState, action: GameAction): GameStat
       const nextPlayer = updatedGame.players[nextPlayerIndex];
       const cardsToAdd = updatedGame.deck.splice(0, 2);
       nextPlayer.cards = [...nextPlayer.cards, ...cardsToAdd];
-      
-      const skipAfterDraw = game.direction === 'clockwise'
-        ? (nextPlayerIndex + 1) % game.players.length
-        : (nextPlayerIndex - 1 + game.players.length) % game.players.length;
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[skipAfterDraw].isCurrentTurn = true;
+      updatedGame.currentPlayerIndex = (nextPlayerIndex + game.direction + game.players.length) % game.players.length;
       break;
 
     case 'wild':
       // Cambia el color
       if (action.selectedColor) {
-        updatedGame.currentCard = { ...action.card, color: action.selectedColor };
+        const newCard = { ...action.card, color: action.selectedColor };
+        updatedGame.lastCard = newCard;
+        updatedGame.discardPile.push(newCard);
       }
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[nextPlayerIndex].isCurrentTurn = true;
+      updatedGame.currentPlayerIndex = nextPlayerIndex;
       break;
 
-    case 'wild4':
+    case 'wildDraw4':
       // Cambia el color y el siguiente jugador roba 4 cartas
       if (action.selectedColor) {
-        updatedGame.currentCard = { ...action.card, color: action.selectedColor };
+        const newCard = { ...action.card, color: action.selectedColor };
+        updatedGame.lastCard = newCard;
+        updatedGame.discardPile.push(newCard);
       }
       const nextPlayerWild4 = updatedGame.players[nextPlayerIndex];
       const cardsToAddWild4 = updatedGame.deck.splice(0, 4);
       nextPlayerWild4.cards = [...nextPlayerWild4.cards, ...cardsToAddWild4];
-      
-      const skipAfterWild4 = game.direction === 'clockwise'
-        ? (nextPlayerIndex + 1) % game.players.length
-        : (nextPlayerIndex - 1 + game.players.length) % game.players.length;
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[skipAfterWild4].isCurrentTurn = true;
+      updatedGame.currentPlayerIndex = (nextPlayerIndex + game.direction + game.players.length) % game.players.length;
       break;
 
     default:
       // Carta normal
-      updatedGame.players[currentPlayerIndex].isCurrentTurn = false;
-      updatedGame.players[nextPlayerIndex].isCurrentTurn = true;
+      updatedGame.currentPlayerIndex = nextPlayerIndex;
   }
 
   return updatedGame;
@@ -205,20 +193,23 @@ export const handleSpecialCard = (game: GameState, action: GameAction): GameStat
 
 export const drawCard = (game: GameState, playerId: string): GameState => {
   const updatedGame = { ...game };
-  const player = updatedGame.players.find(p => p.id === playerId);
+  const playerIndex = updatedGame.players.findIndex(p => p.id === playerId);
   
-  if (player && player.isCurrentTurn) {
+  if (playerIndex === updatedGame.currentPlayerIndex) {
     const drawnCard = updatedGame.deck.shift();
     if (drawnCard) {
-      player.cards.push(drawnCard);
+      updatedGame.players[playerIndex].cards.push(drawnCard);
     }
     
     // Si el mazo está vacío, barajar el descarte
-    if (updatedGame.deck.length === 0) {
-      const currentCard = updatedGame.currentCard;
-      updatedGame.deck = shuffleDeck([...updatedGame.deck]);
-      updatedGame.currentCard = currentCard;
+    if (updatedGame.deck.length === 0 && updatedGame.discardPile.length > 1) {
+      const lastCard = updatedGame.discardPile.pop()!;
+      updatedGame.deck = shuffleDeck(updatedGame.discardPile);
+      updatedGame.discardPile = [lastCard];
     }
+
+    // Pasar al siguiente jugador
+    updatedGame.currentPlayerIndex = (playerIndex + updatedGame.direction + updatedGame.players.length) % updatedGame.players.length;
   }
   
   return updatedGame;
@@ -238,12 +229,8 @@ export const DEFAULT_RULES: GameRules = {
   timeLimit: 30,
 };
 
-export const canPlayAnyCard = (playerCards: Card[], currentCard: Card): boolean => {
-  return playerCards.some(card => isValidPlay(card, currentCard));
-};
-
-export const getValidCards = (playerCards: Card[], currentCard: Card): Card[] => {
-  return playerCards.filter(card => isValidPlay(card, currentCard));
+export const canPlayAnyCard = (playerCards: Card[], lastCard: Card): boolean => {
+  return playerCards.some(card => isValidPlay(card, lastCard));
 };
 
 export const shouldCallUno = (player: Player): boolean => {
@@ -255,7 +242,7 @@ export const calculatePoints = (cards: Card[]): number => {
     if (card.type === 'number') {
       return total + (card.value || 0);
     }
-    if (card.type === 'wild' || card.type === 'wild4') {
+    if (card.type === 'wild' || card.type === 'wildDraw4') {
       return total + 50;
     }
     return total + 20; // Para skip, reverse, draw2
@@ -264,13 +251,13 @@ export const calculatePoints = (cards: Card[]): number => {
 
 export const isStackingAllowed = (
   card: Card,
-  currentCard: Card,
+  lastCard: Card,
   rules: GameRules
 ): boolean => {
   if (!rules.stackDrawCards) return false;
   
-  if (currentCard.type === 'draw2' && card.type === 'draw2') return true;
-  if (currentCard.type === 'wild4' && card.type === 'wild4') return true;
+  if (lastCard.type === 'draw2' && card.type === 'draw2') return true;
+  if (lastCard.type === 'wildDraw4' && card.type === 'wildDraw4') return true;
   
   return false;
 };
@@ -281,15 +268,15 @@ export const handleTimeLimit = (
 ): GameState | null => {
   if (rules.timeLimit === 0) return null;
 
-  const currentPlayer = game.players.find(p => p.isCurrentTurn);
+  const currentPlayer = game.players.find(p => p.isHost);
   if (!currentPlayer) return null;
 
   // Si el jugador no juega en el tiempo límite, roba una carta y pierde el turno
   const updatedGame = drawCard(game, currentPlayer.id);
   const nextPlayerIndex = game.players.findIndex(p => p.id === currentPlayer.id) + 1;
   
-  updatedGame.players[nextPlayerIndex % updatedGame.players.length].isCurrentTurn = true;
-  currentPlayer.isCurrentTurn = false;
+  updatedGame.players[nextPlayerIndex % updatedGame.players.length].isHost = true;
+  currentPlayer.isHost = false;
 
   return updatedGame;
 }; 
