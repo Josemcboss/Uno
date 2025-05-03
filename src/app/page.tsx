@@ -119,7 +119,17 @@ export default function Home() {
         }
       });
 
-      initializeGame();
+      try {
+        const success = await gameClient.connect();
+        if (!success) {
+          setError('No se pudo establecer conexión con el servidor');
+          setIsConnecting(false);
+        }
+      } catch (error) {
+        console.error('Error al conectar:', error);
+        setError('Error al conectar con el servidor');
+        setIsConnecting(false);
+      }
     }
   };
 

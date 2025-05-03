@@ -49,14 +49,19 @@ export class GameClient {
     try {
       console.log('Intentando conectar al servidor...');
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
-        signal: AbortSignal.timeout(5000) // 5 segundos de timeout
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         console.log('Conexión establecida con el servidor');
@@ -66,12 +71,17 @@ export class GameClient {
         this.startPolling();
         return true;
       } else {
-        const errorMessage = await this.handleApiError(response);
-        console.error('Error conectando al servidor:', errorMessage);
+        const errorData = await response.json().catch(() => ({ message: 'Error desconocido del servidor' }));
+        console.error('Error conectando al servidor:', errorData.message);
         await this.handleDisconnect();
         return false;
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('Timeout al conectar con el servidor');
+        this.events.onDisconnect?.();
+        return false;
+      }
       const errorMessage = await this.handleApiError(error);
       console.error('Error de conexión:', errorMessage);
       await this.handleDisconnect();
