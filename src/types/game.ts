@@ -35,8 +35,9 @@ export interface GameState {
   discardPile: Card[];
   direction: 1 | -1;
   lastCard: Card | null;
-  status: 'waiting' | 'playing' | 'finished';
+  status: 'waiting' | 'playing' | 'finished' | 'game_over';
   winner: string | null;
+  gameWinner: string | null;
   roomId?: string;
   roundNumber: number;
   lastAction: {

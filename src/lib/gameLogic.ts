@@ -78,7 +78,11 @@ export const dealCards = (deck: Card[]): {
       id: uuidv4(),
       name: `Player ${i + 1}`,
       cards,
-      isHost: i === 0
+      isHost: i === 0,
+      calledUno: false,
+      score: 0,
+      isConnected: true,
+      lastActive: Date.now()
     });
   }
 
@@ -128,7 +132,10 @@ export const createNewGame = (hostId: string, hostName: string): GameState => {
     direction: 1,
     lastCard,
     status: 'waiting',
-    winner: null
+    winner: null,
+    gameWinner: null,
+    roundNumber: 1,
+    lastAction: null
   };
 };
 
@@ -275,7 +282,7 @@ export const handleTimeLimit = (
 ): GameState | null => {
   if (rules.timeLimit === 0) return null;
 
-  const currentPlayer = game.players.find(p => p.isHost);
+  const currentPlayer = game.players[game.currentPlayerIndex];
   if (!currentPlayer) return null;
 
   // Si el jugador no juega en el tiempo límite, roba una carta y pierde el turno

@@ -72,19 +72,16 @@ export class GameClient {
   }
 
   private async handleDisconnect() {
-    this.isConnected = false;
     this.isPolling = false;
+    this.currentGameId = null;
     this.events.onDisconnect?.();
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`Intento de reconexión ${this.reconnectAttempts} de ${this.maxReconnectAttempts}`);
       await new Promise(resolve => setTimeout(resolve, this.reconnectDelay));
       return this.connect();
-    } else {
-      console.error('Se alcanzó el máximo número de intentos de reconexión');
-      return false;
     }
+    return false;
   }
 
   private startPolling() {
@@ -477,10 +474,7 @@ export class GameClient {
 
       const data = await response.json();
       
-      if (!response.ok) {
-        console.error('Error del servidor:', data);
-        return false;
-      }
+      if (!response.ok) return false;
 
       if (data.game) {
         this.events.onGameUpdated?.(data.game);
@@ -488,15 +482,8 @@ export class GameClient {
       }
       return false;
     } catch (error) {
-      console.error('Error reconnecting:', error);
       return false;
     }
-  }
-
-  disconnect() {
-    this.isPolling = false;
-    this.currentGameId = null;
-    this.events.onDisconnect?.();
   }
 
   async sendChatMessage(message: Message): Promise<boolean> {
@@ -511,15 +498,8 @@ export class GameClient {
       });
 
       const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Error enviando mensaje:', data);
-        return false;
-      }
-
-      return true;
+      return response.ok;
     } catch (error) {
-      console.error('Error sending chat message:', error);
       return false;
     }
   }

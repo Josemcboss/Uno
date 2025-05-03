@@ -1,9 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
-    config.externals = [...config.externals, 'socket.io-client'];
-    return config;
-  },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb'

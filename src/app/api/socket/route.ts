@@ -15,9 +15,6 @@ import {
 import { getGame, setGame, deleteGame, getAllGames } from '../../../lib/redis';
 import { Player } from '../../../types/game';
 
-export const runtime = 'edge';
-export const preferredRegion = 'cdg1';
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);

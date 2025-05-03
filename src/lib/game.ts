@@ -3,6 +3,7 @@ import type { Card, CardColor, CardType, GameState, Player } from '../types/game
 
 const COLORS: CardColor[] = ['red', 'blue', 'green', 'yellow'];
 const NUMBERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const WINNING_SCORE = 500; // Puntuación necesaria para ganar la partida
 
 // Puntuación según las reglas oficiales de UNO
 const CARD_POINTS = {
@@ -77,6 +78,7 @@ export function createGame(hostId: string, hostName: string, roomId?: string): G
     lastCard: null,
     status: 'waiting',
     winner: null,
+    gameWinner: null,
     roomId,
     roundNumber: 1,
     lastAction: null
@@ -318,6 +320,12 @@ function calculateScore(game: GameState): void {
   
   // Asignar puntos al ganador
   game.players[winnerIndex].score += totalPoints;
+  
+  // Verificar si el jugador ganó la partida
+  if (game.players[winnerIndex].score >= WINNING_SCORE) {
+    game.status = 'game_over';
+    game.gameWinner = game.winner;
+  }
 }
 
 // Llamar "UNO" cuando un jugador queda con una carta
@@ -438,7 +446,8 @@ export function drawCard(game: GameState, playerId: string): GameState {
 
 // Iniciar una nueva ronda después de que termina una
 export function startNewRound(game: GameState): GameState {
-  if (game.status !== 'finished') return game;
+  // Si el juego no está terminado o ya hay un ganador final, no hacer nada
+  if (game.status !== 'finished' || game.gameWinner !== null) return game;
   
   const updatedGame = JSON.parse(JSON.stringify(game)) as GameState;
   

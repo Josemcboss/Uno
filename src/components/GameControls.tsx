@@ -17,7 +17,9 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
   
   // Estados de juego
   const isFinished = game.status === 'finished';
+  const isGameOver = game.status === 'game_over';
   const winner = game.winner ? game.players.find(p => p.id === game.winner) : null;
+  const gameWinner = game.gameWinner ? game.players.find(p => p.id === game.gameWinner) : null;
   
   const handleCallUno = async () => {
     if (!socket || !hasOneCard || hasCalledUno) return;
@@ -59,25 +61,30 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
             {game.players.map(player => (
               <li key={player.id} className={player.id === playerId ? "font-bold" : ""}>
                 {player.name}: {player.score} puntos
+                {player.id === game.gameWinner && " 🏆"}
               </li>
             ))}
           </ul>
         </div>
         
         {/* Turno actual */}
-        <p className="text-sm text-black">
-          Turno de: <span className="font-bold">{game.players[game.currentPlayerIndex]?.name || "?"}</span>
-          {isMyTurn && <span className="ml-2 text-green-600">(Es tu turno)</span>}
-        </p>
-        
-        {/* Dirección */}
-        <p className="text-sm text-black">
-          Dirección: {game.direction === 1 ? "→" : "←"}
-        </p>
+        {!isGameOver && (
+          <>
+            <p className="text-sm text-black">
+              Turno de: <span className="font-bold">{game.players[game.currentPlayerIndex]?.name || "?"}</span>
+              {isMyTurn && <span className="ml-2 text-green-600">(Es tu turno)</span>}
+            </p>
+            
+            {/* Dirección */}
+            <p className="text-sm text-black">
+              Dirección: {game.direction === 1 ? "→" : "←"}
+            </p>
+          </>
+        )}
       </div>
       
       {/* Controles de UNO - solo visible en tu turno */}
-      {isMyTurn && hasOneCard && !hasCalledUno && (
+      {isMyTurn && hasOneCard && !hasCalledUno && !isGameOver && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={handleCallUno}
@@ -100,7 +107,7 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
               </span>
               
               {/* Botón para reportar UNO */}
-              {player.cards.length === 1 && !player.calledUno && player.id !== playerId && (
+              {!isGameOver && player.cards.length === 1 && !player.calledUno && player.id !== playerId && (
                 <button
                   onClick={() => handleReportUno(player.id)}
                   className="text-xs bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
@@ -113,32 +120,58 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
         </ul>
       </div>
       
-      {/* Controles de fin de ronda */}
-      {isFinished && (
+      {/* Controles de fin de ronda/partida */}
+      {(isFinished || isGameOver) && (
         <div className="bg-white p-4 rounded-lg shadow-lg text-black">
-          <h3 className="font-bold mb-2 text-green-600">¡Ronda finalizada!</h3>
-          {winner && (
-            <p className="mb-4 text-black">
-              Ganador: <span className="font-bold">{winner.name}</span> (+{winner.score} puntos)
-            </p>
+          {isGameOver ? (
+            <>
+              <h3 className="font-bold mb-2 text-purple-600">¡Fin de la partida!</h3>
+              {gameWinner && (
+                <div className="mb-4">
+                  <p className="text-black">
+                    ¡<span className="font-bold">{gameWinner.name}</span> ha ganado la partida!
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Puntuación final: {gameWinner.score} puntos
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={handleLeaveGame}
+                className="w-full bg-purple-500 text-white py-2 px-4 rounded hover:bg-purple-600 transition-colors"
+              >
+                Volver al menú principal
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 className="font-bold mb-2 text-green-600">¡Ronda finalizada!</h3>
+              {winner && (
+                <p className="mb-4 text-black">
+                  Ganador: <span className="font-bold">{winner.name}</span> (+{winner.score} puntos)
+                </p>
+              )}
+              
+              <button
+                onClick={handleStartNewRound}
+                className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+              >
+                Iniciar nueva ronda
+              </button>
+            </>
           )}
-          
-          <button
-            onClick={handleStartNewRound}
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
-          >
-            Iniciar nueva ronda
-          </button>
         </div>
       )}
       
       {/* Botón para salir del juego */}
-      <button
-        onClick={handleLeaveGame}
-        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition-colors"
-      >
-        Abandonar partida
-      </button>
+      {!isGameOver && (
+        <button
+          onClick={handleLeaveGame}
+          className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition-colors"
+        >
+          Abandonar partida
+        </button>
+      )}
     </div>
   );
 };
