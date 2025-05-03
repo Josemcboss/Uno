@@ -13,6 +13,18 @@ export interface Player {
   name: string;
   cards: Card[];
   isHost: boolean;
+  calledUno: boolean;
+  score: number;
+  isConnected: boolean;
+  lastActive: number;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+  maxPlayers: number;
+  createdAt: number;
 }
 
 export interface GameState {
@@ -25,4 +37,12 @@ export interface GameState {
   lastCard: Card | null;
   status: 'waiting' | 'playing' | 'finished';
   winner: string | null;
+  roomId?: string;
+  roundNumber: number;
+  lastAction: {
+    type: 'play' | 'draw' | 'uno' | 'penalize' | 'join' | 'leave';
+    playerId: string;
+    timestamp: number;
+    card?: Card;
+  } | null;
 } 

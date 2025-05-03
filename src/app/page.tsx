@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card as CardType, GameState, CardColor, Player } from '../types/game';
+import { Card as CardType, GameState, CardColor, Player, Room } from '../types/game';
 import Card from '../components/Card';
 import PlayerHand from '../components/PlayerHand';
 import ColorSelector from '../components/ColorSelector';
 import Chat from '../components/Chat';
+import GameControls from '../components/GameControls';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameClient } from '../lib/socketConfig';
 import React from 'react';
@@ -22,6 +23,10 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [availableGames, setAvailableGames] = useState<Room[]>([]);
+  const [showJoinOptions, setShowJoinOptions] = useState(false);
+  const [createRoomName, setCreateRoomName] = useState('');
+  const [isRoomPrivate, setIsRoomPrivate] = useState(false);
 
   const currentPlayer = React.useMemo(() => 
     gameState?.players.find((p: Player) => p.id === playerId),
@@ -37,7 +42,15 @@ export default function Home() {
     if (savedName) {
       setPlayerName(savedName);
     }
-  }, [isConnected, isConnecting]);
+    
+    // Intentar reconectar a la última partida
+    const lastGameId = localStorage.getItem('lastGameId');
+    const lastPlayerId = localStorage.getItem('lastPlayerId');
+    if (lastGameId && lastPlayerId && !gameState) {
+      setGameId(lastGameId);
+      setPlayerId(lastPlayerId);
+    }
+  }, [isConnected, isConnecting, gameState]);
 
   const initializeGame = async () => {
     if (!gameClient) {
@@ -57,11 +70,16 @@ export default function Home() {
         onGameCreated: (game: GameState) => {
           setGameState(game);
           setGameId(game.id);
-          setPlayerId(game.players[0].id);
+          // Guardar el ID de la partida y del jugador para futura reconexión
           localStorage.setItem('lastGameId', game.id);
+          localStorage.setItem('lastPlayerId', game.players[0].id);
+          setPlayerId(game.players[0].id);
         },
         onGameUpdated: (game: GameState) => {
           setGameState(game);
+        },
+        onRoomsUpdated: (rooms: Room[]) => {
+          setAvailableGames(rooms);
         }
       });
 
@@ -95,6 +113,23 @@ export default function Home() {
       setIsConnecting(false);
     }
   };
+  
+  const reconnectToGame = async () => {
+    if (!gameClient || !gameId || !playerId) return;
+    
+    try {
+      const success = await gameClient.reconnect(gameId, playerId);
+      if (!success) {
+        setError('No se pudo reconectar a la partida. Puede que ya no exista.');
+        // Limpiar datos de la última partida
+        localStorage.removeItem('lastGameId');
+        localStorage.removeItem('lastPlayerId');
+      }
+    } catch (error) {
+      console.error('Error al reconectar a la partida:', error);
+      setError('Error al reconectar a la partida.');
+    }
+  };
 
   const createGame = async () => {
     if (!playerName || !gameClient) {
@@ -110,7 +145,17 @@ export default function Home() {
     setError(null);
     try {
       localStorage.setItem('playerName', playerName);
-      const success = await gameClient.createGame(playerName);
+      
+      // Si hay un nombre de sala, crear primero la sala
+      let roomId: string | undefined = undefined;
+      if (createRoomName.trim()) {
+        const createdRoomId = await gameClient.createRoom(createRoomName, isRoomPrivate);
+        if (createdRoomId) {
+          roomId = createdRoomId;
+        }
+      }
+      
+      const success = await gameClient.createGame(playerName, roomId);
       if (!success) {
         setError('Error al crear el juego. El servidor no respondió correctamente.');
       }
@@ -123,7 +168,13 @@ export default function Home() {
   const joinGame = async () => {
     if (!gameId || !playerName || !gameClient) return;
     localStorage.setItem('playerName', playerName);
+    localStorage.setItem('lastGameId', gameId);
     await gameClient.joinGame(gameId, playerName);
+  };
+  
+  const startGame = async () => {
+    if (!gameState || !gameClient) return;
+    await gameClient.startGame(gameState.id);
   };
 
   const playCard = async (card: CardType) => {
@@ -150,6 +201,17 @@ export default function Home() {
     if (!gameState || !playerId || !gameClient) return;
     await gameClient.drawCard(gameState.id, playerId);
   };
+  
+  const fetchAvailableGames = async () => {
+    if (!gameClient) return;
+    await gameClient.listAvailableGames();
+    setShowJoinOptions(true);
+  };
+  
+  const handleSelectGame = (selectedGameId: string) => {
+    setGameId(selectedGameId);
+    setShowJoinOptions(false);
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-700 p-8">
@@ -162,14 +224,48 @@ export default function Home() {
             className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8"
           >
             <h1 className="text-3xl font-bold mb-6 text-center">UNO Online</h1>
+            
+            {/* Opciones de reconexión */}
+            {gameId && playerId && !gameState && (
+              <div className="mb-6 p-4 bg-blue-100 rounded-lg">
+                <p className="mb-2">Tienes una partida en curso</p>
+                <button
+                  onClick={reconnectToGame}
+                  className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+                >
+                  Reconectar a la partida
+                </button>
+              </div>
+            )}
+            
             <input
               type="text"
               placeholder="Tu nombre"
-              className="w-full p-2 mb-4 border rounded"
+              className="w-full p-2 mb-4 border rounded text-black"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
             />
-            <div className="space-y-4">
+            
+            {/* Opciones para crear juego */}
+            <div className="space-y-2 mb-6">
+              <h3 className="font-semibold">Crear juego</h3>
+              <input
+                type="text"
+                placeholder="Nombre de la sala (opcional)"
+                className="w-full p-2 mb-2 border rounded text-black"
+                value={createRoomName}
+                onChange={(e) => setCreateRoomName(e.target.value)}
+              />
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="privateRoom"
+                  className="mr-2"
+                  checked={isRoomPrivate}
+                  onChange={(e) => setIsRoomPrivate(e.target.checked)}
+                />
+                <label htmlFor="privateRoom">Sala privada</label>
+              </div>
               <button
                 onClick={createGame}
                 className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
@@ -177,11 +273,51 @@ export default function Home() {
               >
                 {isConnecting ? 'Conectando...' : 'Crear Juego'}
               </button>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="font-semibold">Unirse a juego</h3>
+              
+              {!showJoinOptions ? (
+                <button
+                  onClick={fetchAvailableGames}
+                  className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 transition-colors mb-2"
+                  disabled={isConnecting}
+                >
+                  Ver juegos disponibles
+                </button>
+              ) : (
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold mb-2">Partidas disponibles:</h4>
+                  {availableGames.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No hay partidas disponibles</p>
+                  ) : (
+                    <ul className="max-h-40 overflow-y-auto mb-2 border rounded divide-y text-black">
+                      {availableGames.map(game => (
+                        <li 
+                          key={game.id}
+                          onClick={() => handleSelectGame(game.id)}
+                          className="p-2 hover:bg-gray-100 cursor-pointer text-sm text-black"
+                        >
+                          {game.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    onClick={() => setShowJoinOptions(false)}
+                    className="w-full text-sm text-gray-600 p-1"
+                  >
+                    Cerrar lista
+                  </button>
+                </div>
+              )}
+              
               <div className="flex space-x-2">
                 <input
                   type="text"
                   placeholder="ID del juego"
-                  className="flex-1 p-2 border rounded"
+                  className="flex-1 p-2 border rounded text-black"
                   value={gameId}
                   onChange={(e) => setGameId(e.target.value)}
                 />
@@ -193,85 +329,121 @@ export default function Home() {
                   Unirse
                 </button>
               </div>
-              {error && (
-                <div className="text-red-500 mt-4 text-center">
-                  <p>{error}</p>
-                  {!isConnected && (
-                    <button 
-                      onClick={reconnect}
-                      className="mt-2 bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 transition-colors"
-                      disabled={isConnecting}
-                    >
-                      {isConnecting ? 'Conectando...' : 'Reconectar'}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
+              
+            {error && (
+              <div className="text-red-500 mt-4 text-center">
+                <p>{error}</p>
+                {!isConnected && (
+                  <button 
+                    onClick={reconnect}
+                    className="mt-2 bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 transition-colors"
+                    disabled={isConnecting}
+                  >
+                    {isConnecting ? 'Conectando...' : 'Reconectar'}
+                  </button>
+                )}
+              </div>
+            )}
           </motion.div>
         ) : (
           <div className="relative min-h-screen">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-white mb-4"
-            >
-              <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
-              <div className="mt-2">
-                {gameState.players.map((player: Player) => (
-                  <motion.div
-                    key={player.id}
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    className={`${
-                      gameState.currentPlayerIndex === gameState.players.indexOf(player) ? 'text-yellow-300' : ''
-                    }`}
-                  >
-                    {player.name} ({player.cards.length} cartas)
-                    {player.id === playerId && ' (Tú)'}
-                  </motion.div>
-                ))}
+            {/* Estado de espera */}
+            {gameState.status === 'waiting' && currentPlayer && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full text-black">
+                  <h2 className="text-2xl font-bold mb-4 text-center text-black">Sala de espera</h2>
+                  <p className="mb-4 text-black">Jugadores conectados: {gameState.players.length}</p>
+                  
+                  <ul className="mb-6 space-y-1 text-black">
+                    {gameState.players.map(player => (
+                      <li key={player.id} className="flex items-center text-black">
+                        <span className={player.isHost ? "font-bold text-black" : "text-black"}>
+                          {player.name} {player.isHost && "(Anfitrión)"}
+                          {player.id === playerId && " (Tú)"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <div className="mb-4">
+                    <p className="mb-2 text-sm text-black">ID de la sala: <span className="font-mono text-xs bg-gray-100 p-1 rounded text-black">{gameState.id}</span></p>
+                    <p className="text-sm text-black">Comparte este código para que otros jugadores se unan.</p>
+                  </div>
+                  
+                  {currentPlayer.isHost && (
+                    <button
+                      onClick={startGame}
+                      className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+                      disabled={gameState.players.length < 2}
+                    >
+                      {gameState.players.length < 2 
+                        ? "Esperando más jugadores..." 
+                        : "Iniciar partida"}
+                    </button>
+                  )}
+                </div>
               </div>
-            </motion.div>
-
-            <div className="flex justify-center items-center my-8">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring' }}
-              >
-                {gameState.lastCard && <Card card={gameState.lastCard} />}
-              </motion.div>
-            </div>
-
-            {currentPlayer && (
+            )}
+            
+            {/* Juego en progreso */}
+            {gameState.status !== 'waiting' && (
               <>
-                <PlayerHand
-                  cards={currentPlayer.cards}
-                  onCardClick={playCard}
-                  isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
-                />
-                {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={drawCard}
-                    className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-white mb-4"
+                >
+                  <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
+                </motion.div>
+
+                <div className="flex justify-center items-center my-8">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring' }}
                   >
-                    Robar Carta
-                  </motion.button>
+                    {gameState.lastCard && <Card card={gameState.lastCard} />}
+                  </motion.div>
+                </div>
+
+                {currentPlayer && (
+                  <>
+                    <PlayerHand
+                      cards={currentPlayer.cards}
+                      onCardClick={playCard}
+                      isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
+                    />
+                    
+                    {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
+                      <motion.button
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        onClick={drawCard}
+                        className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
+                      >
+                        Robar Carta
+                      </motion.button>
+                    )}
+                  </>
+                )}
+
+                <Chat
+                  gameId={gameState.id}
+                  playerName={playerName}
+                  socket={gameClient}
+                />
+                
+                <GameControls
+                  game={gameState}
+                  playerId={playerId}
+                  socket={gameClient}
+                />
+
+                {showColorSelector && (
+                  <ColorSelector onColorSelect={handleColorSelect} />
                 )}
               </>
-            )}
-
-            <Chat
-              gameId={gameState.id}
-              playerName={playerName}
-              socket={gameClient}
-            />
-
-            {showColorSelector && (
-              <ColorSelector onColorSelect={handleColorSelect} />
             )}
           </div>
         )}

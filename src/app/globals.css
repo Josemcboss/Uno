@@ -74,3 +74,13 @@ body {
     @apply bg-black text-white;
   }
 }
+
+/* Asegurar que el texto sea negro en todos los componentes */
+* {
+  color-scheme: light;
+}
+
+/* Color específico para textos en áreas con fondos oscuros */
+.bg-blue-900 *, .bg-blue-800 *, .bg-blue-700 * {
+  color: white;
+}

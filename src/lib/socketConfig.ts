@@ -1,11 +1,13 @@
 import type { GameState, Card, CardColor } from '../types/game';
 import type { Message } from '../components/Chat';
+import type { Room } from '../types/game';
 
 export interface GameEvents {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onGameCreated?: (game: GameState) => void;
   onGameUpdated?: (game: GameState) => void;
+  onRoomsUpdated?: (rooms: Room[]) => void;
   onChatMessage?: (message: Message) => void;
 }
 
@@ -31,17 +33,24 @@ export class GameClient {
 
     try {
       console.log('Intentando conectar al servidor...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      // Usar un enfoque de promesa con timeout en lugar de AbortController
+      const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 5000): Promise<Response> => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise<Response>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), timeout)
+          ) as Promise<Response>
+        ]);
+      };
 
-      const response = await fetch(`${this.baseUrl}/socket`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/socket`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-        signal: controller.signal
-      }).finally(() => clearTimeout(timeoutId));
+        }
+      });
 
       if (response.ok) {
         console.log('Conexión establecida con el servidor');
@@ -85,18 +94,23 @@ export class GameClient {
   }
 
   private async poll() {
+    const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 5000): Promise<Response> => {
+      return Promise.race([
+        fetch(url, options),
+        new Promise<Response>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), timeout)
+        ) as Promise<Response>
+      ]);
+    };
+
     while (this.isPolling && this.isConnected) {
       try {
         if (this.currentGameId) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-          
-          const response = await fetch(`${this.baseUrl}/socket?gameId=${this.currentGameId}`, {
+          const response = await fetchWithTimeout(`${this.baseUrl}/socket?gameId=${this.currentGameId}`, {
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
-            },
-            signal: controller.signal
-          }).finally(() => clearTimeout(timeoutId));
+            }
+          });
           
           if (response.ok) {
             const data = await response.json();
@@ -115,7 +129,66 @@ export class GameClient {
     }
   }
 
-  async createGame(playerName: string) {
+  // Obtener salas disponibles
+  async listAvailableGames(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket?listGames=true`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error al obtener salas:', data);
+        return false;
+      }
+
+      if (data.games) {
+        this.events.onRoomsUpdated?.(data.games);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error listing games:', error);
+      return false;
+    }
+  }
+  
+  // Crear una sala
+  async createRoom(roomName: string, isPrivate: boolean = false, maxPlayers: number = 8): Promise<string | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'create_room',
+          roomName,
+          isPrivate,
+          maxPlayers
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error al crear sala:', data);
+        return null;
+      }
+
+      if (data.room && data.room.id) {
+        return data.room.id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error creating room:', error);
+      return null;
+    }
+  }
+
+  async createGame(playerName: string, roomId?: string): Promise<boolean> {
     try {
       const playerId = crypto.randomUUID();
       const response = await fetch(`${this.baseUrl}/socket`, {
@@ -124,7 +197,8 @@ export class GameClient {
         body: JSON.stringify({ 
           action: 'create_game',
           playerId,
-          playerName 
+          playerName,
+          roomId
         })
       });
 
@@ -147,7 +221,7 @@ export class GameClient {
     }
   }
 
-  async joinGame(gameId: string, playerName: string) {
+  async joinGame(gameId: string, playerName: string): Promise<boolean> {
     try {
       const playerId = crypto.randomUUID();
       this.currentGameId = gameId;
@@ -179,8 +253,37 @@ export class GameClient {
       return false;
     }
   }
+  
+  async startGame(gameId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'start_game', 
+          gameId
+        })
+      });
 
-  async playCard(gameId: string, playerId: string, card: Card, selectedColor?: CardColor) {
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error starting game:', error);
+      return false;
+    }
+  }
+
+  async playCard(gameId: string, playerId: string, card: Card, selectedColor?: CardColor): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
@@ -212,7 +315,7 @@ export class GameClient {
     }
   }
 
-  async drawCard(gameId: string, playerId: string) {
+  async drawCard(gameId: string, playerId: string): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
@@ -241,9 +344,158 @@ export class GameClient {
       return false;
     }
   }
+  
+  async callUno(gameId: string, playerId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'call_uno', 
+          gameId, 
+          playerId 
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error calling UNO:', error);
+      return false;
+    }
+  }
+  
+  async penalizePlayer(gameId: string, playerId: string, reportedById: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'penalize_player', 
+          gameId, 
+          playerId,
+          reportedById
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error penalizing player:', error);
+      return false;
+    }
+  }
+  
+  async startNewRound(gameId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'start_new_round', 
+          gameId
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error starting new round:', error);
+      return false;
+    }
+  }
+  
+  async leaveGame(gameId: string, playerId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'leave_game', 
+          gameId,
+          playerId
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      this.currentGameId = null;
+      return true;
+    } catch (error) {
+      console.error('Error leaving game:', error);
+      return false;
+    }
+  }
+  
+  async reconnect(gameId: string, playerId: string): Promise<boolean> {
+    try {
+      this.currentGameId = gameId;
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reconnect', 
+          gameId,
+          playerId
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error reconnecting:', error);
+      return false;
+    }
+  }
 
   disconnect() {
     this.isPolling = false;
+    this.currentGameId = null;
     this.events.onDisconnect?.();
   }
 } 
