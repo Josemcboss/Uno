@@ -24,6 +24,26 @@ export const getGame = async (gameId: string) => {
   }
 };
 
+export const getAllGames = async () => {
+  try {
+    const keys = await redis.keys('game:*');
+    const games = [];
+    for (const key of keys) {
+      const game = await redis.get(key);
+      if (game) {
+        games.push({
+          id: key.replace('game:', ''),
+          ...JSON.parse(JSON.stringify(game))
+        });
+      }
+    }
+    return games;
+  } catch (error) {
+    console.error('Error listing games:', error);
+    return [];
+  }
+};
+
 export const setGame = async (gameId: string, game: any) => {
   try {
     await redis.set(`game:${gameId}`, game);
