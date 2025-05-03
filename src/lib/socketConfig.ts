@@ -1,5 +1,5 @@
 import type { GameState, Card, CardColor } from '../types/game';
-import type { Message } from '../components/Chat';
+import type { Message } from '../types/chat';
 import type { Room } from '../types/game';
 
 export interface GameEvents {

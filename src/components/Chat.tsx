@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameClient } from '../lib/socketConfig';
-
-export interface Message {
-  id: string;
-  playerName: string;
-  text: string;
-  timestamp: number;
-}
+import { Message } from '../types/chat';
 
 interface ChatProps {
   playerName: string;
