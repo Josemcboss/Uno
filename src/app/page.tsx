@@ -16,6 +16,7 @@ import { AIPlayer } from '../services/AIPlayer';
 import SoundEffects from '../services/SoundEffects';
 import Achievements from '../services/Achievements';
 import AchievementNotification from '../components/AchievementNotification';
+import { Achievement } from '../services/Achievements';
 
 let gameClient: GameClient | null = null;
 
@@ -201,7 +202,11 @@ export default function Home() {
   const playCard = async (card: CardType) => {
     if (!gameState || !playerId || !gameClient) return;
 
-    if (card.type === 'wild' || card.type === 'wildDraw4') {
+    const isWildCard = (card: CardType) => {
+      return card.type === 'wild' || card.type === 'wildDraw4';
+    };
+
+    if (isWildCard(card)) {
       setSelectedCard(card);
       setShowColorSelector(true);
       return;
@@ -211,7 +216,7 @@ export default function Home() {
     SoundEffects.play('cardPlay');
 
     // Verificar logros relacionados con cartas
-    if (card.type === 'wild' || card.type === 'wildDraw4') {
+    if (isWildCard(card)) {
       const achievement = Achievements.updateProgress('wild_cards', 1);
       if (achievement) setUnlockedAchievement(achievement);
     }
@@ -460,7 +465,7 @@ export default function Home() {
 
                 <GameTable
                   gameState={gameState}
-                  currentPlayer={currentPlayer}
+                  currentPlayer={currentPlayer!}
                   onDrawCard={drawCard}
                   isCurrentPlayerTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
                 />
