@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card as CardType, GameState, Player } from '../types/game';
+import { GameState, Player } from '../types/game';
 import Card from './Card';
 import { motion } from 'framer-motion';
 import { GiCardDraw } from 'react-icons/gi';
