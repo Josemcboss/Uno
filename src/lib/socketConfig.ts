@@ -28,28 +28,34 @@ export class GameClient {
     this.events = events;
   }
 
+  private async handleApiError(error: any): Promise<string> {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (error.response) {
+      try {
+        const data = await error.response.json();
+        return data.message || 'Error del servidor';
+      } catch {
+        return `Error ${error.response.status}: ${error.response.statusText}`;
+      }
+    }
+    return 'Error desconocido';
+  }
+
   async connect() {
     if (this.isConnected) return true;
 
     try {
       console.log('Intentando conectar al servidor...');
       
-      // Usar un enfoque de promesa con timeout en lugar de AbortController
-      const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 5000): Promise<Response> => {
-        return Promise.race([
-          fetch(url, options),
-          new Promise<Response>((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), timeout)
-          ) as Promise<Response>
-        ]);
-      };
-
-      const response = await fetchWithTimeout(`${this.baseUrl}/socket`, {
+      const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-        }
+        },
+        signal: AbortSignal.timeout(5000) // 5 segundos de timeout
       });
 
       if (response.ok) {
@@ -60,12 +66,14 @@ export class GameClient {
         this.startPolling();
         return true;
       } else {
-        console.error('Error conectando al servidor:', response.status);
+        const errorMessage = await this.handleApiError(response);
+        console.error('Error conectando al servidor:', errorMessage);
         await this.handleDisconnect();
         return false;
       }
     } catch (error) {
-      console.error('Error de conexión:', error);
+      const errorMessage = await this.handleApiError(error);
+      console.error('Error de conexión:', errorMessage);
       await this.handleDisconnect();
       return false;
     }
@@ -74,10 +82,12 @@ export class GameClient {
   private async handleDisconnect() {
     this.isPolling = false;
     this.currentGameId = null;
+    this.isConnected = false;
     this.events.onDisconnect?.();
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
+      console.log(`Intento de reconexión ${this.reconnectAttempts} de ${this.maxReconnectAttempts}`);
       await new Promise(resolve => setTimeout(resolve, this.reconnectDelay));
       return this.connect();
     }

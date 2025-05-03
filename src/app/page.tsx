@@ -34,6 +34,9 @@ export default function Home() {
   const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
   const [winningStreak, setWinningStreak] = useState<number>(0);
 
+  // Nuevo estado para mostrar errores en móviles
+  const [showErrorModal, setShowErrorModal] = useState(false);
+
   const currentPlayer = React.useMemo(() => 
     gameState?.players.find((p: Player) => p.id === playerId),
     [gameState?.players, playerId]
@@ -249,9 +252,30 @@ export default function Home() {
   };
   
   const fetchAvailableGames = async () => {
-    if (!gameClient) return;
-    await gameClient.listAvailableGames();
-    setShowJoinOptions(true);
+    try {
+      setIsConnecting(true);
+      if (!gameClient) {
+        gameClient = new GameClient({
+          onConnect: () => setIsConnecting(false),
+          onDisconnect: () => handleError('Desconectado del servidor'),
+          onGameCreated: (game) => setGameState(game),
+          onGameUpdated: (game) => setGameState(game),
+          onRoomsUpdated: (rooms) => setAvailableGames(rooms),
+          onChatMessage: () => {}
+        });
+      }
+      await gameClient.connect();
+      const success = await gameClient.listAvailableGames();
+      if (success) {
+        setShowJoinOptions(true);
+      } else {
+        handleError('Error al obtener la lista de juegos');
+      }
+    } catch (err) {
+      handleError('Error de conexión: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setIsConnecting(false);
+    }
   };
   
   const handleSelectGame = (selectedGameId: string) => {
@@ -283,9 +307,39 @@ export default function Home() {
     }
   }, [gameState?.status, gameState?.winner, playerId, winningStreak]);
 
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
+    setShowErrorModal(true);
+    // Auto-ocultar el error después de 5 segundos
+    setTimeout(() => {
+      setShowErrorModal(false);
+      setError(null);
+    }, 5000);
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-700 p-8">
       <AnimatePresence>
+        {/* Error Modal para móviles */}
+        {showErrorModal && error && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-20 left-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">{error}</div>
+              <button 
+                onClick={() => setShowErrorModal(false)}
+                className="ml-4 text-white opacity-70 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {!gameState ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
