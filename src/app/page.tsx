@@ -84,7 +84,7 @@ export default function Home() {
       });
 
       try {
-        await gameClient.connect();
+      await gameClient.connect();
       } catch (err) {
         console.error('Error al inicializar:', err);
         setIsConnecting(false);
@@ -389,49 +389,49 @@ export default function Home() {
             {/* Juego en progreso */}
             {gameState.status !== 'waiting' && (
               <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-white mb-4"
-                >
-                  <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
-                </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-white mb-4"
+            >
+              <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
+            </motion.div>
 
-                <div className="flex justify-center items-center my-8">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring' }}
-                  >
-                    {gameState.lastCard && <Card card={gameState.lastCard} />}
-                  </motion.div>
-                </div>
+            <div className="flex justify-center items-center my-8">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring' }}
+              >
+                {gameState.lastCard && <Card card={gameState.lastCard} />}
+              </motion.div>
+            </div>
 
-                {currentPlayer && (
-                  <>
-                    <PlayerHand
-                      cards={currentPlayer.cards}
-                      onCardClick={playCard}
-                      isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
-                    />
-                    
-                    {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
-                      <motion.button
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        onClick={drawCard}
-                        className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
-                      >
-                        Robar Carta
-                      </motion.button>
-                    )}
-                  </>
-                )}
-
-                <Chat
-                  playerName={playerName}
-                  socket={gameClient}
+            {currentPlayer && (
+              <>
+                <PlayerHand
+                  cards={currentPlayer.cards}
+                  onCardClick={playCard}
+                  isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
                 />
+                    
+                {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={drawCard}
+                    className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
+                  >
+                    Robar Carta
+                  </motion.button>
+                )}
+              </>
+            )}
+
+            <Chat
+              playerName={playerName}
+              socket={gameClient}
+            />
                 
                 <GameControls
                   game={gameState}
@@ -439,8 +439,8 @@ export default function Home() {
                   socket={gameClient}
                 />
 
-                {showColorSelector && (
-                  <ColorSelector onColorSelect={handleColorSelect} />
+            {showColorSelector && (
+              <ColorSelector onColorSelect={handleColorSelect} />
                 )}
               </>
             )}

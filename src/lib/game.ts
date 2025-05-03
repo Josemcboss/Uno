@@ -48,10 +48,27 @@ export function createDeck(): Card[] {
 
 export function shuffleDeck(deck: Card[]): Card[] {
   const shuffled = [...deck];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  let currentIndex = shuffled.length;
+  let randomIndex;
+
+  // Mientras queden elementos para barajar
+  while (currentIndex !== 0) {
+    // Seleccionar un elemento restante
+    randomIndex = Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (0xffffffff + 1) * currentIndex);
+    currentIndex--;
+
+    // E intercambiarlo con el elemento actual
+    [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
   }
+
+  // Realizar un segundo pase de barajado para mayor aleatoriedad
+  currentIndex = shuffled.length;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (0xffffffff + 1) * currentIndex);
+    currentIndex--;
+    [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
+  }
+
   return shuffled;
 }
 
@@ -204,7 +221,7 @@ export function playCard(game: GameState, playerId: string, cardId: string, newC
       if (updatedGame.players.length === 2) {
         updatedGame.currentPlayerIndex = playerIndex;
       } else {
-        updatedGame.currentPlayerIndex = getNextPlayerIndex(updatedGame, 1);
+      updatedGame.currentPlayerIndex = getNextPlayerIndex(updatedGame, 1);
       }
       break;
       
@@ -287,9 +304,9 @@ export function playCard(game: GameState, playerId: string, cardId: string, newC
   // Verificar si necesitamos rebarajar
   if (updatedGame.deck.length < 4 && updatedGame.status !== 'finished') {
     if (updatedGame.discardPile.length > 1) {
-      const lastCard = updatedGame.discardPile.pop()!;
-      updatedGame.deck = shuffleDeck(updatedGame.discardPile);
-      updatedGame.discardPile = [lastCard];
+    const lastCard = updatedGame.discardPile.pop()!;
+    updatedGame.deck = shuffleDeck(updatedGame.discardPile);
+    updatedGame.discardPile = [lastCard];
     }
   }
 
@@ -390,7 +407,7 @@ export function penalizePlayer(game: GameState, playerId: string, reportedById: 
       timestamp: Date.now()
     };
   }
-  
+
   return updatedGame;
 }
 
@@ -429,7 +446,7 @@ export function drawCard(game: GameState, playerId: string): GameState {
   // Robar una carta del mazo
   const drawnCard = updatedGame.deck.pop()!;
   player.cards.push(drawnCard);
-  
+
   // Registrar la acción
   updatedGame.lastAction = {
     type: 'draw',
@@ -534,8 +551,8 @@ export function removePlayer(game: GameState, playerId: string): GameState {
     
     // Si es el turno de este jugador, pasar al siguiente
     if (playerIndex === updatedGame.currentPlayerIndex) {
-      updatedGame.currentPlayerIndex = getNextPlayerIndex(updatedGame, 1);
-    }
+    updatedGame.currentPlayerIndex = getNextPlayerIndex(updatedGame, 1);
+  }
   } else {
     // Si el juego está en espera, eliminar al jugador completamente
     updatedGame.players.splice(playerIndex, 1);
@@ -565,6 +582,6 @@ export function reconnectPlayer(game: GameState, playerId: string): GameState {
   
   updatedGame.players[playerIndex].isConnected = true;
   updatedGame.players[playerIndex].lastActive = Date.now();
-  
+
   return updatedGame;
 } 

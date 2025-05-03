@@ -12,21 +12,23 @@ interface CardProps {
   card: CardType;
   onClick?: () => void;
   isPlayable?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false }) => {
+const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false, size = 'md' }) => {
   const getCardIcon = () => {
+    const iconSize = size === 'sm' ? 'text-2xl' : size === 'md' ? 'text-4xl' : 'text-5xl';
     switch (card.type) {
       case 'skip':
-        return <FaBan className="text-4xl" />;
+        return <FaBan className={iconSize} />;
       case 'reverse':
-        return <IoIosRefresh className="text-4xl" />;
+        return <IoIosRefresh className={iconSize} />;
       case 'draw2':
-        return <GiCardDraw className="text-4xl" />;
+        return <GiCardDraw className={iconSize} />;
       case 'wild':
-        return <GiCardRandom className="text-4xl" />;
+        return <GiCardRandom className={iconSize} />;
       case 'wildDraw4':
-        return <GiCardJoker className="text-4xl" />;
+        return <GiCardJoker className={iconSize} />;
       default:
         return null;
     }
@@ -39,12 +41,18 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false }) => {
     return card.type.toUpperCase();
   };
 
+  const sizeClasses = {
+    sm: 'w-16 h-24 text-lg',
+    md: 'w-24 h-36 text-2xl',
+    lg: 'w-32 h-48 text-3xl'
+  };
+
   return (
     <div
       onClick={isPlayable ? onClick : undefined}
       className={`
-        w-24 h-36 rounded-xl shadow-lg flex items-center justify-center
-        font-bold text-2xl text-white transform transition-transform
+        ${sizeClasses[size]} rounded-xl shadow-lg flex items-center justify-center
+        font-bold text-white transform transition-transform
         ${isPlayable ? 'hover:scale-110 cursor-pointer' : ''}
         ${card.color === 'red' ? 'bg-red-600' : ''}
         ${card.color === 'blue' ? 'bg-blue-600' : ''}
@@ -70,49 +78,14 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false }) => {
       </div>
 
       {/* Contenido de la carta */}
-      <div className="relative w-full h-full flex items-center justify-center">
-        {/* Esquina superior izquierda */}
-        <div className="absolute top-2 left-2 text-sm flex flex-col items-center">
-          <span>{getCardContent()}</span>
-          {getCardIcon() && (
-            <div className="transform scale-50">
-              {getCardIcon()}
-            </div>
-          )}
-        </div>
-
-        {/* Centro */}
-        <div className="flex flex-col items-center justify-center">
-          {card.type === 'number' ? (
-            <span className="text-6xl font-bold">{card.value}</span>
-          ) : (
-            <>
-              {getCardIcon()}
-              <span className="text-sm mt-2">{card.type.toUpperCase()}</span>
-            </>
-          )}
-        </div>
-
-        {/* Esquina inferior derecha */}
-        <div className="absolute bottom-2 right-2 text-sm flex flex-col items-center transform rotate-180">
-          <span>{getCardContent()}</span>
-          {getCardIcon() && (
-            <div className="transform scale-50">
-              {getCardIcon()}
-            </div>
-          )}
-        </div>
-
-        {/* Marca de agua del logo UNO */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-          <div className="text-6xl font-black transform -rotate-45">
-            UNO
-          </div>
-        </div>
+      <div className="relative z-10 flex flex-col items-center justify-center">
+        {getCardIcon()}
+        {card.type === 'number' && (
+          <span className={size === 'sm' ? 'text-2xl' : size === 'md' ? 'text-3xl' : 'text-4xl'}>
+            {getCardContent()}
+          </span>
+        )}
       </div>
-
-      {/* Efecto de brillo */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white opacity-10" />
     </div>
   );
 };
