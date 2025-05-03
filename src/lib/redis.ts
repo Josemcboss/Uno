@@ -1,35 +1,34 @@
 import { Redis } from '@upstash/redis';
 
-// Para el desarrollo y la demostración, vamos a usar un cliente mock si las variables de entorno no están disponibles
-const isEnvAvailable = 
-  typeof process.env.UPSTASH_REDIS_REST_URL === 'string' && 
+// Verificamos si las variables de entorno están disponibles
+const isEnvAvailable =
+  typeof process.env.UPSTASH_REDIS_REST_URL === 'string' &&
   typeof process.env.UPSTASH_REDIS_REST_TOKEN === 'string';
 
-// Creamos un mapa en memoria para almacenar datos si Redis no está disponible
+// Almacenamiento en memoria como fallback (modo desarrollo)
 const memoryStore = new Map();
 
-const createRedisClient = () => {
-  if (isEnvAvailable) {
-    return new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL || '',
-      token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+// Redis client (singleton)
+let redis: Redis | null = null;
+const getRedis = (): Redis | null => {
+  if (!redis && isEnvAvailable) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
       enableTelemetry: false,
     });
   }
-  
-  console.warn('Variables de entorno Redis no disponibles. Usando almacenamiento en memoria.');
-  return null;
+  return redis;
 };
 
-const redis = createRedisClient();
-
+// Obtener juego
 export const getGame = async (gameId: string) => {
+  const client = getRedis();
   try {
-    if (redis) {
-      const game = await redis.get(`game:${gameId}`);
+    if (client) {
+      const game = await client.get(`game:${gameId}`);
       return game ? JSON.parse(JSON.stringify(game)) : null;
     } else {
-      // Fallback a almacenamiento en memoria
       return memoryStore.get(`game:${gameId}`) || null;
     }
   } catch (error) {
@@ -38,29 +37,30 @@ export const getGame = async (gameId: string) => {
   }
 };
 
+// Obtener todos los juegos
 export const getAllGames = async () => {
+  const client = getRedis();
   try {
-    if (redis) {
-      const keys = await redis.keys('game:*');
+    if (client) {
+      const keys = await client.keys('game:*');
       const games = [];
       for (const key of keys) {
-        const game = await redis.get(key);
+        const game = await client.get(key);
         if (game) {
           games.push({
             id: key.replace('game:', ''),
-            ...JSON.parse(JSON.stringify(game))
+            ...JSON.parse(JSON.stringify(game)),
           });
         }
       }
       return games;
     } else {
-      // Fallback a almacenamiento en memoria
       const games = [];
       for (const [key, value] of memoryStore.entries()) {
         if (key.startsWith('game:')) {
           games.push({
             id: key.replace('game:', ''),
-            ...value
+            ...value,
           });
         }
       }
@@ -72,14 +72,14 @@ export const getAllGames = async () => {
   }
 };
 
+// Guardar juego
 export const setGame = async (gameId: string, game: any) => {
+  const client = getRedis();
   try {
-    if (redis) {
-      await redis.set(`game:${gameId}`, game);
-      // Establecer un tiempo de expiración de 24 horas
-      await redis.expire(`game:${gameId}`, 24 * 60 * 60);
+    if (client) {
+      await client.set(`game:${gameId}`, game);
+      await client.expire(`game:${gameId}`, 24 * 60 * 60); // 24h
     } else {
-      // Fallback a almacenamiento en memoria
       memoryStore.set(`game:${gameId}`, game);
     }
   } catch (error) {
@@ -88,12 +88,13 @@ export const setGame = async (gameId: string, game: any) => {
   }
 };
 
+// Eliminar juego
 export const deleteGame = async (gameId: string) => {
+  const client = getRedis();
   try {
-    if (redis) {
-      await redis.del(`game:${gameId}`);
+    if (client) {
+      await client.del(`game:${gameId}`);
     } else {
-      // Fallback a almacenamiento en memoria
       memoryStore.delete(`game:${gameId}`);
     }
   } catch (error) {
@@ -101,5 +102,3 @@ export const deleteGame = async (gameId: string) => {
     throw error;
   }
 };
-
-export default redis; 
