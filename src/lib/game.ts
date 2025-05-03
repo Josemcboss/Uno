@@ -431,28 +431,42 @@ export function drawCard(game: GameState, playerId: string): GameState {
   // Actualizar el lastActive del jugador
   player.lastActive = Date.now();
 
+  // Determinar cuántas cartas debe robar
+  let cardsToDraw = 1;
+  const lastAction = updatedGame.lastAction;
+  
+  // Si hay un acumulado de cartas para robar
+  if (lastAction?.card?.type === 'draw2' || lastAction?.card?.type === 'wildDraw4') {
+    cardsToDraw = lastAction.card.type === 'draw2' ? 2 : 4;
+  }
+
   // Verificar si necesitamos rebarajar
-  if (updatedGame.deck.length === 0) {
+  while (updatedGame.deck.length < cardsToDraw) {
     if (updatedGame.discardPile.length > 1) {
       const lastCard = updatedGame.discardPile.pop()!;
       updatedGame.deck = shuffleDeck(updatedGame.discardPile);
       updatedGame.discardPile = [lastCard];
     } else {
-      // No hay cartas para robar
-      return game;
+      // No hay suficientes cartas para robar
+      cardsToDraw = updatedGame.deck.length;
+      if (cardsToDraw === 0) {
+        return game;
+      }
+      break;
     }
   }
 
-  // Robar una carta del mazo
-  const drawnCard = updatedGame.deck.pop()!;
-  player.cards.push(drawnCard);
+  // Robar las cartas del mazo
+  const drawnCards = updatedGame.deck.splice(0, cardsToDraw);
+  player.cards.push(...drawnCards);
 
   // Registrar la acción
   updatedGame.lastAction = {
     type: 'draw',
     playerId,
     timestamp: Date.now(),
-    card: drawnCard
+    card: drawnCards[drawnCards.length - 1], // Registrar la última carta robada
+    cardsDrawn: cardsToDraw // Añadir información sobre cuántas cartas se robaron
   };
 
   // Pasar al siguiente jugador

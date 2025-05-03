@@ -45,5 +45,6 @@ export interface GameState {
     playerId: string;
     timestamp: number;
     card?: Card;
+    cardsDrawn?: number;
   } | null;
 } 
