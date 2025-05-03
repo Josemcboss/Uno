@@ -11,7 +11,6 @@ import { GameClient } from '../lib/socketConfig';
 import React from 'react';
 import GameTable from '../components/GameTable';
 import AIPlayerButton from '../components/AIPlayerButton';
-import { AIPlayer } from '../services/AIPlayer';
 import SoundEffects from '../services/SoundEffects';
 import Achievements, { Achievement } from '../services/Achievements';
 import AchievementNotification from '../components/AchievementNotification';
@@ -61,6 +60,7 @@ export default function Home() {
     };
 
     checkConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, isConnecting, gameState]);
 
   useEffect(() => {
