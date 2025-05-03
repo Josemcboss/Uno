@@ -14,9 +14,8 @@ export class GameClient {
   private isPolling: boolean = false;
 
   constructor(events: GameEvents) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    this.baseUrl = isProduction 
-      ? 'https://uno-kdtahzpxs-josemcboss-projects.vercel.app/api'
+    this.baseUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/api`
       : 'http://localhost:3000/api';
     this.events = events;
   }

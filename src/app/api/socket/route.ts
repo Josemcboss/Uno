@@ -1,21 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { GameState } from '../../../types/game';
 import { createGame, dealInitialCards, drawCard, playCard } from '../../../lib/game';
+import { getGame, setGame } from '../../../lib/redis';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
-
-const games = new Map<string, GameState>();
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const gameId = searchParams.get('gameId');
 
-  if (gameId && games.has(gameId)) {
-    return new NextResponse(
-      JSON.stringify({ game: games.get(gameId) }),
-      { status: 200 }
-    );
+  if (gameId) {
+    const game = await getGame(gameId);
+    if (game) {
+      return new NextResponse(
+        JSON.stringify({ game }),
+        { status: 200 }
+      );
+    }
   }
 
   return new NextResponse(
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
         );
       }
       const newGame = createGame(playerId, playerName);
-      games.set(newGame.id, newGame);
+      await setGame(newGame.id, newGame);
       return new NextResponse(
         JSON.stringify({ game: newGame }),
         { status: 200 }
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const gameToJoin = games.get(gameId);
+      const gameToJoin = await getGame(gameId);
       if (!gameToJoin) {
         return new NextResponse(
           JSON.stringify({ error: 'Game not found' }),
@@ -69,6 +71,7 @@ export async function POST(req: Request) {
         cards: [],
         isHost: false
       });
+      await setGame(gameId, gameToJoin);
       return new NextResponse(
         JSON.stringify({ game: gameToJoin }),
         { status: 200 }
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const gameToStart = games.get(gameId);
+      const gameToStart = await getGame(gameId);
       if (!gameToStart) {
         return new NextResponse(
           JSON.stringify({ error: 'Game not found' }),
@@ -96,7 +99,7 @@ export async function POST(req: Request) {
       }
       const startedGame = dealInitialCards(gameToStart);
       startedGame.status = 'playing';
-      games.set(gameId, startedGame);
+      await setGame(gameId, startedGame);
       return new NextResponse(
         JSON.stringify({ game: startedGame }),
         { status: 200 }
@@ -109,7 +112,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const gameToPlay = games.get(gameId);
+      const gameToPlay = await getGame(gameId);
       if (!gameToPlay) {
         return new NextResponse(
           JSON.stringify({ error: 'Game not found' }),
@@ -117,7 +120,7 @@ export async function POST(req: Request) {
         );
       }
       const updatedGame = playCard(gameToPlay, playerId, cardId, newColor);
-      games.set(gameId, updatedGame);
+      await setGame(gameId, updatedGame);
       return new NextResponse(
         JSON.stringify({ game: updatedGame }),
         { status: 200 }
@@ -130,7 +133,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const gameToDraw = games.get(gameId);
+      const gameToDraw = await getGame(gameId);
       if (!gameToDraw) {
         return new NextResponse(
           JSON.stringify({ error: 'Game not found' }),
@@ -138,7 +141,7 @@ export async function POST(req: Request) {
         );
       }
       const gameAfterDraw = drawCard(gameToDraw, playerId);
-      games.set(gameId, gameAfterDraw);
+      await setGame(gameId, gameAfterDraw);
       return new NextResponse(
         JSON.stringify({ game: gameAfterDraw }),
         { status: 200 }
