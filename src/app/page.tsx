@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Card as CardType, GameState, CardColor, Player, Room } from '../types/game';
-import Card from '../components/Card';
 import PlayerHand from '../components/PlayerHand';
 import ColorSelector from '../components/ColorSelector';
 import Chat from '../components/Chat';
@@ -14,9 +13,8 @@ import GameTable from '../components/GameTable';
 import AIPlayerButton from '../components/AIPlayerButton';
 import { AIPlayer } from '../services/AIPlayer';
 import SoundEffects from '../services/SoundEffects';
-import Achievements from '../services/Achievements';
+import Achievements, { Achievement } from '../services/Achievements';
 import AchievementNotification from '../components/AchievementNotification';
-import { Achievement } from '../services/Achievements';
 
 let gameClient: GameClient | null = null;
 
@@ -59,7 +57,7 @@ export default function Home() {
       setGameId(lastGameId);
       setPlayerId(lastPlayerId);
     }
-  }, [isConnected, isConnecting, gameState]);
+  }, [isConnected, isConnecting, gameState, gameState?.players]);
 
   useEffect(() => {
     SoundEffects.initialize();
