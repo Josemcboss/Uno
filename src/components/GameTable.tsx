@@ -3,6 +3,7 @@ import { GameState, Player } from '../types/game';
 import Card from './Card';
 import { motion } from 'framer-motion';
 import { GiCardDraw } from 'react-icons/gi';
+import OpponentHand from './OpponentHand';
 
 interface GameTableProps {
   gameState: GameState;
@@ -35,45 +36,95 @@ const GameTable: React.FC<GameTableProps> = ({
 
   // Filtrar jugadores de forma segura
   const otherPlayers = gameState.players.filter(p => {
-    const isValidPlayer = p && p.id && p.id !== currentPlayer.id;
+    const isValidPlayer = p && 
+      typeof p.id === 'string' && 
+      p.id !== currentPlayer.id && 
+      typeof p.name === 'string' && 
+      Array.isArray(p.cards);
+      
     if (!isValidPlayer) {
-      console.log('GameTable - Jugador inválido encontrado:', p);
+      console.log('GameTable - Jugador inválido encontrado:', {
+        player: p,
+        reason: !p ? 'jugador nulo' :
+                !p.id ? 'sin ID' :
+                typeof p.id !== 'string' ? 'ID no es string' :
+                p.id === currentPlayer.id ? 'es jugador actual' :
+                !p.name ? 'sin nombre' :
+                !Array.isArray(p.cards) ? 'cartas no es array' :
+                'razón desconocida'
+      });
     }
     return isValidPlayer;
   });
 
+  const getOpponentPosition = (index: number, totalPlayers: number): 'top' | 'left' | 'right' => {
+    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
+    const relativePosition = (index - playerIndex + totalPlayers) % totalPlayers;
+    
+    switch (totalPlayers) {
+      case 2:
+        return 'top';
+      case 3:
+        return relativePosition === 1 ? 'left' : 'right';
+      case 4:
+        switch (relativePosition) {
+          case 1:
+            return 'left';
+          case 2:
+            return 'top';
+          case 3:
+            return 'right';
+          default:
+            return 'top';
+        }
+      default:
+        return 'top';
+    }
+  };
+
   return (
-    <div className="relative w-full h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)] bg-green-800 shadow-inner">
-      {/* Efecto de textura de fieltro */}
-      <div className="absolute inset-0 bg-[url('/felt-texture.png')] opacity-20 mix-blend-multiply" />
+    <div className="relative w-full h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)]">
+      {/* Marco de madera */}
+      <div className="absolute inset-0 border-[20px] sm:border-[30px] rounded-lg" style={{
+        borderImage: 'url(/wood-texture.png) 30 30 stretch',
+        borderStyle: 'solid',
+      }} />
       
-      {/* Área central de la mesa */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative flex items-center space-x-4 sm:space-x-8">
-          {/* Mazo para robar */}
-          <motion.div
-            whileHover={isCurrentPlayerTurn ? { scale: 1.05 } : {}}
-            whileTap={isCurrentPlayerTurn ? { scale: 0.95 } : {}}
-            className={`relative ${isCurrentPlayerTurn ? 'cursor-pointer active:scale-95' : ''} touch-manipulation`}
-            onClick={isCurrentPlayerTurn ? onDrawCard : undefined}
-          >
+      {/* Mesa de juego */}
+      <div className="absolute inset-[20px] sm:inset-[30px] bg-green-800 shadow-inner rounded-lg overflow-hidden">
+        {/* Efecto de textura de fieltro */}
+        <div className="absolute inset-0 bg-[url('/felt-texture.png')] opacity-20 mix-blend-multiply" />
+        
+        {/* Botón de robar carta */}
+        <motion.div
+          whileHover={isCurrentPlayerTurn ? { scale: 1.05 } : {}}
+          whileTap={isCurrentPlayerTurn ? { scale: 0.95 } : {}}
+          className={`
+            absolute right-4 top-1/2 transform -translate-y-1/2
+            ${isCurrentPlayerTurn ? 'cursor-pointer' : 'opacity-50'}
+            touch-manipulation z-50
+          `}
+          onClick={isCurrentPlayerTurn ? onDrawCard : undefined}
+        >
+          <div className="relative">
             {/* Cartas apiladas del mazo */}
             {[...Array(Math.min(3, gameState.deck.length))].map((_, i) => (
               <div
                 key={i}
                 className="absolute"
                 style={{
-                  transform: `translateY(${i * -1}px)`,
+                  transform: `translateX(${i * -1}px)`,
                   zIndex: i,
                 }}
               >
-                <div className="w-16 h-24 sm:w-24 sm:h-36 md:w-28 md:h-40 lg:w-32 lg:h-48 rounded-lg bg-blue-900 border-2 border-white shadow-lg">
+                <div className="w-16 h-24 sm:w-20 sm:h-28 rounded-lg bg-blue-900 border-2 border-white shadow-lg rotate-90">
                   <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-white transform rotate-45 text-2xl sm:text-4xl font-bold">UNO</div>
+                    <div className="text-white transform -rotate-90 text-lg sm:text-xl font-bold">UNO</div>
                   </div>
                 </div>
               </div>
             ))}
+            
             {isCurrentPlayerTurn && (
               <motion.div
                 animate={{ opacity: [0.5, 1, 0.5] }}
@@ -83,8 +134,11 @@ const GameTable: React.FC<GameTableProps> = ({
                 <GiCardDraw className="text-xl sm:text-2xl text-white" />
               </motion.div>
             )}
-          </motion.div>
+          </div>
+        </motion.div>
 
+        {/* Área central de la mesa */}
+        <div className="absolute inset-0 flex items-center justify-center">
           {/* Pila de descarte */}
           <motion.div
             initial={{ scale: 0 }}
@@ -111,32 +165,22 @@ const GameTable: React.FC<GameTableProps> = ({
             ))}
           </motion.div>
         </div>
-      </div>
 
-      {/* Información de otros jugadores */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-4 px-2 sm:px-4 flex-wrap">
-        {otherPlayers.map(player => {
-          const playerIndex = gameState.players.findIndex(p => p && p.id === player.id);
-          const isCurrentTurn = gameState.currentPlayerIndex === playerIndex;
-          
-          return (
-            <motion.div
+        {/* Manos de los oponentes */}
+        {gameState.players
+          .filter(player => player.id !== currentPlayer.id)
+          .map((player, index) => (
+            <OpponentHand
               key={player.id}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`
-                px-2 sm:px-4 py-1 sm:py-2 rounded-lg
-                ${isCurrentTurn ? 'bg-yellow-500' : 'bg-gray-800'}
-                text-white shadow-lg
-              `}
-            >
-              <div className="text-center">
-                <div className="text-sm sm:text-base font-bold">{player.name}</div>
-                <div className="text-xs sm:text-sm">{player.cards.length} cartas</div>
-              </div>
-            </motion.div>
-          );
-        })}
+              cardCount={player.cards.length}
+              playerName={player.name}
+              isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === player.id)}
+              position={getOpponentPosition(
+                gameState.players.findIndex(p => p.id === player.id),
+                gameState.players.length
+              )}
+            />
+          ))}
       </div>
     </div>
   );

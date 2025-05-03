@@ -598,4 +598,24 @@ export function reconnectPlayer(game: GameState, playerId: string): GameState {
   updatedGame.players[playerIndex].lastActive = Date.now();
 
   return updatedGame;
+}
+
+export function isGameInactive(game: GameState): boolean {
+  // Una sala está inactiva si:
+  // 1. No tiene jugadores
+  if (game.players.length === 0) return true;
+  
+  // 2. Está en espera y no ha tenido actividad en los últimos 30 minutos
+  if (game.status === 'waiting') {
+    const inactiveTime = Date.now() - (game.lastAction?.timestamp || game.players[0].lastActive);
+    return inactiveTime > 30 * 60 * 1000; // 30 minutos
+  }
+  
+  // 3. Todos los jugadores están desconectados por más de 10 minutos
+  if (game.players.every(p => !p.isConnected)) {
+    const lastActiveTime = Math.max(...game.players.map(p => p.lastActive));
+    return Date.now() - lastActiveTime > 10 * 60 * 1000; // 10 minutos
+  }
+  
+  return false;
 } 

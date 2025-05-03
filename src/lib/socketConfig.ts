@@ -539,7 +539,8 @@ export class GameClient {
 
   async addAIPlayer(gameId: string, aiName: string): Promise<boolean> {
     try {
-      console.log('Enviando solicitud para añadir IA:', { gameId, aiName });
+      const aiPlayerId = crypto.randomUUID();
+      console.log('Enviando solicitud para añadir IA:', { gameId, aiName, aiPlayerId });
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
         headers: { 
@@ -547,9 +548,11 @@ export class GameClient {
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
         body: JSON.stringify({ 
-          action: 'add_ai_player',
+          action: 'join_game',
           gameId,
-          aiName
+          playerId: aiPlayerId,
+          playerName: aiName,
+          isAI: true
         })
       });
 

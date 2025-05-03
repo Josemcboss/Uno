@@ -10,16 +10,37 @@ import {
   addPlayer,
   removePlayer,
   reconnectPlayer,
-  createRoom
+  createRoom,
+  isGameInactive
 } from '../../../lib/game';
 import { getGame, setGame, deleteGame, getAllGames } from '../../../lib/redis';
 import { Player } from '../../../types/game';
+
+// Función para limpiar salas inactivas
+async function cleanInactiveGames() {
+  try {
+    const games = await getAllGames();
+    for (const game of games) {
+      if (isGameInactive(game)) {
+        await deleteGame(game.id);
+        console.log(`Sala inactiva eliminada: ${game.id}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error al limpiar salas inactivas:', error);
+  }
+}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const gameId = searchParams.get('gameId');
     const listGames = searchParams.get('listGames');
+
+    // Limpiar salas inactivas antes de listar los juegos
+    if (listGames === 'true') {
+      await cleanInactiveGames();
+    }
 
     // Listar juegos disponibles (para unirse)
     if (listGames === 'true') {

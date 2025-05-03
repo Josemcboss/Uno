@@ -14,6 +14,7 @@ import AIPlayerButton from '../components/AIPlayerButton';
 import SoundEffects from '../services/SoundEffects';
 import Achievements, { Achievement } from '../services/Achievements';
 import AchievementNotification from '../components/AchievementNotification';
+import { AIPlayer } from '../services/AIPlayer';
 
 let gameClient: GameClient | null = null;
 
@@ -41,6 +42,38 @@ export default function Home() {
     gameState?.players.find((p: Player) => p.id === playerId),
     [gameState?.players, playerId]
   );
+
+  // Referencia al último estado del juego para usar en efectos
+  const gameStateRef = React.useRef<GameState | null>(null);
+  gameStateRef.current = gameState;
+
+  // Efecto para manejar el turno de la IA
+  useEffect(() => {
+    const handleAITurn = async () => {
+      if (!gameState || !gameClient) return;
+
+      const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+      if (!currentPlayer) return;
+
+      // Verificar si el jugador actual es una IA
+      if (currentPlayer.name.startsWith('IA-')) {
+        console.log('Es el turno de la IA:', currentPlayer.name);
+        
+        try {
+          // Pequeña pausa para simular "pensamiento"
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Ejecutar el turno de la IA
+          await AIPlayer.playTurn(gameState, currentPlayer, gameClient);
+        } catch (error) {
+          console.error('Error durante el turno de la IA:', error);
+        }
+      }
+    };
+
+    // Llamar a handleAITurn cuando cambie el jugador actual
+    handleAITurn();
+  }, [gameState?.currentPlayerIndex]);
 
   useEffect(() => {
     const checkConnection = async () => {
