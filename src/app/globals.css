@@ -4,15 +4,19 @@
 
 :root {
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --background-start-rgb: 240, 245, 255;
   --background-end-rgb: 255, 255, 255;
+  --primary-color: 37, 99, 235;
+  --secondary-color: 79, 70, 229;
+  --card-width: 6rem;
+  --card-height: 9rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --background-start-rgb: 10, 20, 40;
+    --background-end-rgb: 0, 0, 20;
   }
 }
 
@@ -20,28 +24,53 @@ body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
     to bottom,
-    transparent,
+    rgb(var(--background-start-rgb)),
     rgb(var(--background-end-rgb))
-  )
-  rgb(var(--background-start-rgb));
+  );
   min-height: 100vh;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 @layer components {
   .card {
     @apply relative w-24 h-36 rounded-lg shadow-md transition-transform duration-200 ease-in-out;
+    width: var(--card-width);
+    height: var(--card-height);
   }
 
   .card:hover {
-    @apply transform scale-105;
+    @apply transform scale-105 shadow-lg;
   }
 
   .button {
-    @apply px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200;
+    @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md;
   }
 
   .input {
-    @apply px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+  }
+
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .card-red {
+    @apply bg-red-500 text-white;
+  }
+
+  .card-blue {
+    @apply bg-blue-500 text-white;
+  }
+
+  .card-green {
+    @apply bg-green-500 text-white;
+  }
+
+  .card-yellow {
+    @apply bg-yellow-500 text-black;
+  }
+
+  .card-black {
+    @apply bg-black text-white;
   }
 }
