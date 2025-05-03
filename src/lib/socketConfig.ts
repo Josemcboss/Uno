@@ -13,7 +13,7 @@ export class GameClient {
   private pollInterval: number = 1000;
   private isPolling: boolean = false;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
+  private maxReconnectAttempts: number = 10;
   private reconnectDelay: number = 2000;
   private isConnected: boolean = false;
   private currentGameId: string | null = null;
@@ -28,12 +28,18 @@ export class GameClient {
     if (this.isConnected) return true;
 
     try {
+      console.log('Intentando conectar al servidor...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
 
       if (response.ok) {
         console.log('Conexión establecida con el servidor');
@@ -79,14 +85,25 @@ export class GameClient {
   private async poll() {
     while (this.isPolling && this.isConnected) {
       try {
-        const response = await fetch(`${this.baseUrl}/socket?gameId=${this.currentGameId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.game) {
-            this.events.onGameUpdated?.(data.game);
+        if (this.currentGameId) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
+          const response = await fetch(`${this.baseUrl}/socket?gameId=${this.currentGameId}`, {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+            },
+            signal: controller.signal
+          }).finally(() => clearTimeout(timeoutId));
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.game) {
+              this.events.onGameUpdated?.(data.game);
+            }
+          } else {
+            throw new Error(`Error en la respuesta del polling: ${response.status}`);
           }
-        } else {
-          throw new Error('Error en la respuesta del polling');
         }
       } catch (error) {
         console.error('Error polling:', error);

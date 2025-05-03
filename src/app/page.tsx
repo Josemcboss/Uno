@@ -21,6 +21,7 @@ export default function Home() {
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const currentPlayer = React.useMemo(() => 
     gameState?.players.find((p: Player) => p.id === playerId),
@@ -28,7 +29,7 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isConnecting) {
       initializeGame();
     }
     // Cargar el nombre del jugador del localStorage
@@ -36,17 +37,22 @@ export default function Home() {
     if (savedName) {
       setPlayerName(savedName);
     }
-  }, [isConnected]);
+  }, [isConnected, isConnecting]);
 
   const initializeGame = async () => {
     if (!gameClient) {
+      setIsConnecting(true);
       gameClient = new GameClient({
         onConnect: () => {
           console.log('Conectado al servidor');
           setIsConnected(true);
+          setIsConnecting(false);
+          setError(null);
         },
         onDisconnect: () => {
           setIsConnected(false);
+          setIsConnecting(false);
+          setError('Se perdió la conexión con el servidor. Por favor, intenta reconectar.');
         },
         onGameCreated: (game: GameState) => {
           setGameState(game);
@@ -59,7 +65,34 @@ export default function Home() {
         }
       });
 
-      await gameClient.connect();
+      try {
+        await gameClient.connect();
+      } catch (err) {
+        console.error('Error al inicializar:', err);
+        setIsConnecting(false);
+        setError('Error al conectar con el servidor. Por favor, intenta más tarde.');
+      }
+    }
+  };
+
+  const reconnect = async () => {
+    setError('Intentando reconectar...');
+    setIsConnecting(true);
+    
+    try {
+      if (gameClient) {
+        const success = await gameClient.connect();
+        if (!success) {
+          setError('No se pudo establecer conexión con el servidor. Por favor, intenta de nuevo más tarde.');
+        }
+      } else {
+        await initializeGame();
+      }
+    } catch (err) {
+      console.error('Error al reconectar:', err);
+      setError('Error al conectar con el servidor. Por favor, intenta más tarde.');
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -70,7 +103,7 @@ export default function Home() {
     }
     if (!isConnected) {
       setError('No hay conexión con el servidor. Intentando reconectar...');
-      await initializeGame();
+      await reconnect();
       return;
     }
 
@@ -140,9 +173,9 @@ export default function Home() {
               <button
                 onClick={createGame}
                 className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
-                disabled={!playerName}
+                disabled={!playerName || isConnecting}
               >
-                Crear Juego
+                {isConnecting ? 'Conectando...' : 'Crear Juego'}
               </button>
               <div className="flex space-x-2">
                 <input
@@ -155,15 +188,26 @@ export default function Home() {
                 <button
                   onClick={joinGame}
                   className="bg-green-500 text-white px-4 rounded hover:bg-green-600 transition-colors"
-                  disabled={!gameId || !playerName}
+                  disabled={!gameId || !playerName || isConnecting}
                 >
                   Unirse
                 </button>
               </div>
+              {error && (
+                <div className="text-red-500 mt-4 text-center">
+                  <p>{error}</p>
+                  {!isConnected && (
+                    <button 
+                      onClick={reconnect}
+                      className="mt-2 bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 transition-colors"
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? 'Conectando...' : 'Reconectar'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            {error && (
-              <p className="text-red-500 mt-4 text-center">{error}</p>
-            )}
           </motion.div>
         ) : (
           <div className="relative min-h-screen">
