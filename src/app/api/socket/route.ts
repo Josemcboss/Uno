@@ -6,23 +6,43 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const gameId = searchParams.get('gameId');
+  try {
+    const { searchParams } = new URL(req.url);
+    const gameId = searchParams.get('gameId');
 
-  if (gameId) {
+    if (!gameId) {
+      return new NextResponse(
+        JSON.stringify({ message: 'Conexión establecida' }),
+        { status: 200 }
+      );
+    }
+
     const game = await getGame(gameId);
     if (game) {
       return new NextResponse(
         JSON.stringify({ game }),
-        { status: 200 }
+        { 
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
       );
     }
-  }
 
-  return new NextResponse(
-    JSON.stringify({ message: 'Game not found' }),
-    { status: 404 }
-  );
+    return new NextResponse(
+      JSON.stringify({ message: 'Game not found' }),
+      { status: 404 }
+    );
+  } catch (error) {
+    console.error('Error in GET handler:', error);
+    return new NextResponse(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: Request) {
