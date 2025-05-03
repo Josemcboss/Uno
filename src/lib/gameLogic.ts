@@ -111,6 +111,13 @@ export function getValidCards(cards: Card[], lastCard: Card): Card[] {
 export const createNewGame = (hostId: string, hostName: string): GameState => {
   const deck = createDeck();
   const { players, remainingDeck, lastCard } = dealCards(deck);
+  
+  // Asignar el hostId al primer jugador
+  if (players.length > 0) {
+    players[0].id = hostId;
+    players[0].name = hostName;
+    players[0].isHost = true;
+  }
 
   return {
     id: uuidv4(),
