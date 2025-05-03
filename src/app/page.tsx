@@ -64,12 +64,25 @@ export default function Home() {
   };
 
   const createGame = async () => {
-    if (!playerName || !gameClient) return;
+    if (!playerName || !gameClient) {
+      setError('Por favor ingresa tu nombre');
+      return;
+    }
+    if (!isConnected) {
+      setError('No hay conexión con el servidor. Intentando reconectar...');
+      await initializeGame();
+      return;
+    }
+
     setError(null);
     try {
       localStorage.setItem('playerName', playerName);
-      await gameClient.createGame(playerName);
+      const success = await gameClient.createGame(playerName);
+      if (!success) {
+        setError('Error al crear el juego. El servidor no respondió correctamente.');
+      }
     } catch (err) {
+      console.error('Error creating game:', err);
       setError('Error al crear el juego. Por favor, intenta de nuevo.');
     }
   };

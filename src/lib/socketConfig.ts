@@ -66,9 +66,25 @@ export class GameClient {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'createGame', playerName })
+        body: JSON.stringify({ 
+          action: 'create_game',
+          playerId: crypto.randomUUID(),
+          playerName 
+        })
       });
-      return response.ok;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error:', errorData);
+        return false;
+      }
+
+      const data = await response.json();
+      if (data.game) {
+        this.events.onGameCreated?.(data.game);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Error creating game:', error);
       return false;
@@ -80,7 +96,12 @@ export class GameClient {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'joinGame', gameId, playerName })
+        body: JSON.stringify({ 
+          action: 'join_game', 
+          gameId, 
+          playerId: crypto.randomUUID(),
+          playerName 
+        })
       });
       return response.ok;
     } catch (error) {
@@ -94,7 +115,13 @@ export class GameClient {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'playCard', gameId, playerId, card, selectedColor })
+        body: JSON.stringify({ 
+          action: 'play_card', 
+          gameId, 
+          playerId, 
+          cardId: card.id,
+          newColor: selectedColor 
+        })
       });
       return response.ok;
     } catch (error) {
@@ -108,7 +135,11 @@ export class GameClient {
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'drawCard', gameId, playerId })
+        body: JSON.stringify({ 
+          action: 'draw_card', 
+          gameId, 
+          playerId 
+        })
       });
       return response.ok;
     } catch (error) {
