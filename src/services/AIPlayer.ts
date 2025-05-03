@@ -2,73 +2,136 @@ import { Card, GameState, Player, CardColor } from '../types/game';
 import { GameClient } from '../lib/socketConfig';
 
 export class AIPlayer {
-  private static readonly DELAY = 800; // Reducido de 1500 a 800ms
+  private static readonly DELAY = 400; // Reducido para acelerar el juego
 
   static async playTurn(gameState: GameState, aiPlayer: Player, gameClient: GameClient): Promise<void> {
     try {
       console.log('IA iniciando turno:', {
         aiName: aiPlayer.name,
         cardsCount: aiPlayer.cards.length,
-        topCard: gameState.discardPile[gameState.discardPile.length - 1]
+        currentPlayerIdx: gameState.currentPlayerIndex,
+        aiPlayerIdx: gameState.players.findIndex(p => p.id === aiPlayer.id)
       });
 
-      // Verificar que sea realmente el turno de la IA
-      const currentPlayerIndex = gameState.players.findIndex(p => p.id === aiPlayer.id);
-      if (currentPlayerIndex !== gameState.currentPlayerIndex) {
-        console.log('No es el turno de la IA');
+      // Verificación adicional del turno de la IA
+      const aiPlayerIndex = gameState.players.findIndex(p => p.id === aiPlayer.id);
+      if (aiPlayerIndex !== gameState.currentPlayerIndex) {
+        console.log('No es el turno de la IA - verificación inicial fallida');
         return;
       }
 
+      // Primera pausa para simular "pensamiento"
       await new Promise(resolve => setTimeout(resolve, this.DELAY));
 
-      const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-      const playableCards = aiPlayer.cards.filter(card => 
+      // Verificar de nuevo el estado del juego para asegurarnos de que no haya cambiado
+      const refreshedGameState = await gameClient.getGameState(gameState.id);
+      if (!refreshedGameState) {
+        console.log('No se pudo obtener el estado actualizado del juego');
+        return;
+      }
+
+      // Verificar que siga siendo el turno de la IA
+      const updatedAiPlayerIndex = refreshedGameState.players.findIndex(p => p.id === aiPlayer.id);
+      if (updatedAiPlayerIndex !== refreshedGameState.currentPlayerIndex) {
+        console.log('No es el turno de la IA - verificación posterior fallida');
+        return;
+      }
+
+      const refreshedAiPlayer = refreshedGameState.players[updatedAiPlayerIndex];
+      const topCard = refreshedGameState.discardPile[refreshedGameState.discardPile.length - 1];
+      
+      // Determinar cartas jugables
+      const playableCards = refreshedAiPlayer.cards.filter(card => 
         this.canPlayCard(card, topCard)
       );
 
       console.log('Cartas jugables de la IA:', {
-        total: aiPlayer.cards.length,
+        total: refreshedAiPlayer.cards.length,
         playable: playableCards.length,
-        cards: playableCards.map(c => `${c.color || 'black'} ${c.type}${c.value !== undefined ? ' ' + c.value : ''}`)
+        topCard: `${topCard.color || 'black'} ${topCard.type}${topCard.value !== undefined ? ' ' + topCard.value : ''}`
       });
 
+      // Si no hay cartas jugables, robar
       if (playableCards.length === 0) {
         console.log('IA necesita robar carta');
+        
+        // Verificar una vez más que siga siendo nuestro turno
+        const preDrawGameState = await gameClient.getGameState(gameState.id);
+        if (!preDrawGameState || preDrawGameState.currentPlayerIndex !== updatedAiPlayerIndex) {
+          console.log('Ya no es el turno de la IA antes de robar');
+          return;
+        }
+        
         await gameClient.drawCard(gameState.id, aiPlayer.id);
+        console.log('IA ha robado una carta');
         
         // Esperar un momento para que se actualice el estado del juego
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Verificar si la carta robada se puede jugar
-        const updatedGameState = await gameClient.getGameState(gameState.id);
-        if (!updatedGameState) return;
+        const postDrawGameState = await gameClient.getGameState(gameState.id);
+        if (!postDrawGameState) {
+          console.log('No se pudo obtener el estado después de robar');
+          return;
+        }
 
-        const updatedAIPlayer = updatedGameState.players.find((p: Player) => p.id === aiPlayer.id);
-        if (!updatedAIPlayer) return;
+        // Verificar si todavía es el turno de la IA después de robar
+        const postDrawAiIndex = postDrawGameState.players.findIndex(p => p.id === aiPlayer.id);
+        if (postDrawAiIndex !== postDrawGameState.currentPlayerIndex) {
+          console.log('Ya no es el turno de la IA después de robar');
+          return;
+        }
 
-        const lastDrawnCard = updatedAIPlayer.cards[updatedAIPlayer.cards.length - 1];
+        const postDrawAiPlayer = postDrawGameState.players[postDrawAiIndex];
+        const lastDrawnCard = postDrawAiPlayer.cards[postDrawAiPlayer.cards.length - 1];
+        
+        // Verificar si la carta robada se puede jugar
         if (lastDrawnCard && this.canPlayCard(lastDrawnCard, topCard)) {
-          // Si la carta robada se puede jugar, jugarla después de una pequeña pausa
+          console.log('IA puede jugar la carta recién robada');
           await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Verificar una vez más antes de jugar
+          const finalCheckState = await gameClient.getGameState(gameState.id);
+          if (!finalCheckState || finalCheckState.currentPlayerIndex !== postDrawAiIndex) {
+            console.log('Ya no es el turno de la IA antes de jugar carta robada');
+            return;
+          }
+          
           if (lastDrawnCard.type === 'wild' || lastDrawnCard.type === 'wildDraw4') {
-            const color = this.getMostFrequentColor(updatedAIPlayer.cards);
+            const color = this.getMostFrequentColor(postDrawAiPlayer.cards);
+            console.log(`IA jugando carta robada wild con color ${color}`);
             await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard, color);
           } else {
+            console.log('IA jugando carta robada normal');
             await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard);
           }
+          
+          // Verificar si hay que llamar UNO
+          if (postDrawAiPlayer.cards.length === 2) {
+            await gameClient.callUno(gameState.id, aiPlayer.id);
+          }
+        } else {
+          console.log('IA no puede jugar la carta robada, pasando turno');
         }
         return;
       }
 
       // Elegir la mejor carta para jugar
-      const cardToPlay = this.chooseBestCard(playableCards, aiPlayer.cards);
+      const cardToPlay = this.chooseBestCard(playableCards, refreshedAiPlayer.cards);
       console.log('IA eligió jugar:', {
         card: `${cardToPlay.color || 'black'} ${cardToPlay.type}${cardToPlay.value !== undefined ? ' ' + cardToPlay.value : ''}`
       });
       
+      // Verificar de nuevo que siga siendo nuestro turno antes de jugar
+      const finalGameState = await gameClient.getGameState(gameState.id);
+      if (!finalGameState || finalGameState.currentPlayerIndex !== updatedAiPlayerIndex) {
+        console.log('Ya no es el turno de la IA antes de jugar carta elegida');
+        return;
+      }
+      
       // Si es una carta wild, elegir el color más frecuente
       if (cardToPlay.type === 'wild' || cardToPlay.type === 'wildDraw4') {
-        const color = this.getMostFrequentColor(aiPlayer.cards);
+        const color = this.getMostFrequentColor(refreshedAiPlayer.cards);
         console.log('IA eligiendo color para carta wild:', color);
         await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay, color);
       } else {
@@ -76,10 +139,12 @@ export class AIPlayer {
       }
 
       // Llamar UNO si corresponde
-      if (aiPlayer.cards.length === 2) {
+      if (refreshedAiPlayer.cards.length === 2) {
         console.log('IA llamando UNO');
         await gameClient.callUno(gameState.id, aiPlayer.id);
       }
+      
+      console.log('IA completó su turno con éxito');
     } catch (error) {
       console.error('Error en el turno de la IA:', error);
     }

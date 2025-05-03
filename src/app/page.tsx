@@ -49,31 +49,66 @@ export default function Home() {
 
   // Efecto para manejar el turno de la IA
   useEffect(() => {
+    let isMounted = true;
+    let aiTurnTimeout: NodeJS.Timeout | null = null;
+
     const handleAITurn = async () => {
       if (!gameState || !gameClient || gameState.status !== 'playing') return;
 
-      const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+      const currentPlayerIndex = gameState.currentPlayerIndex;
+      const currentPlayer = gameState.players[currentPlayerIndex];
+      
       if (!currentPlayer) return;
 
       // Verificar si el jugador actual es una IA
       if (currentPlayer.name.startsWith('IA-')) {
-        console.log('Es el turno de la IA:', currentPlayer.name);
+        console.log('Es el turno de la IA:', currentPlayer.name, 'Índice:', currentPlayerIndex);
         
         try {
-          // Pequeña pausa para simular "pensamiento"
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Verificación adicional para asegurarnos de que el estado sea reciente
+          const freshGameState = await gameClient?.getGameState(gameState.id);
+          if (!freshGameState) {
+            console.log('No se pudo obtener el estado fresco del juego');
+            return;
+          }
           
-          // Ejecutar el turno de la IA
-          await AIPlayer.playTurn(gameState, currentPlayer, gameClient);
+          // Verificar que siga siendo el turno de la IA
+          if (freshGameState.currentPlayerIndex !== currentPlayerIndex) {
+            console.log('El turno cambió antes de que la IA pudiera jugar');
+            return;
+          }
+          
+          // Pequeña pausa para evitar colisiones con otros eventos
+          if (isMounted) {
+            aiTurnTimeout = setTimeout(async () => {
+              if (!isMounted || !gameClient) return;
+              
+              const refreshedPlayer = freshGameState.players.find(p => p.id === currentPlayer.id);
+              if (!refreshedPlayer) {
+                console.log('No se pudo encontrar el jugador IA en el estado actualizado');
+                return;
+              }
+              
+              // Ejecutar el turno de la IA
+              await AIPlayer.playTurn(freshGameState, refreshedPlayer, gameClient);
+            }, 500);
+          }
         } catch (error) {
           console.error('Error durante el turno de la IA:', error);
         }
       }
     };
 
-    // Llamar a handleAITurn cuando cambie el jugador actual o el estado del juego
+    // Iniciar el proceso si es necesario
     handleAITurn();
-  }, [gameState?.currentPlayerIndex, gameState?.status, gameState?.players, gameClient]);
+
+    return () => {
+      isMounted = false;
+      if (aiTurnTimeout) {
+        clearTimeout(aiTurnTimeout);
+      }
+    };
+  }, [gameState, gameClient]);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -383,7 +418,7 @@ export default function Home() {
         setUnlockedAchievement(achievements[0]);
       }
     }
-  }, [gameState?.status, gameState?.winner, playerId, winningStreak]);
+  }, [gameState, playerId, winningStreak]);
 
   const handleError = (errorMessage: string) => {
     setError(errorMessage);

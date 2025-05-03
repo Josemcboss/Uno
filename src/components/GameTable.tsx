@@ -200,7 +200,7 @@ const GameTable: React.FC<GameTableProps> = ({
 
         {/* Manos de los oponentes */}
         <AnimatePresence>
-          {otherPlayers.map((player, index) => (
+          {otherPlayers.map(player => (
             <motion.div
               key={player.id}
               initial={{ opacity: 0, y: -20 }}
