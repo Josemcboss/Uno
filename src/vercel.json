@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "regions": ["cdg1"],
+  "functions": {
+    "api/socket.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+} 
