@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { GameClient } from '../lib/socketConfig';
 
-interface Message {
+export interface Message {
   id: string;
   playerName: string;
   text: string;
@@ -10,7 +11,7 @@ interface Message {
 interface ChatProps {
   gameId: string;
   playerName: string;
-  socket: any;
+  socket: GameClient | null;
 }
 
 const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
@@ -19,14 +20,15 @@ const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    socket.on('chatMessage', (message: Message) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    return () => {
-      socket.off('chatMessage');
+    // Simular recepción de un mensaje de bienvenida al inicio
+    const welcomeMessage: Message = {
+      id: Date.now().toString(),
+      playerName: 'Sistema',
+      text: '¡Bienvenido al chat del juego!',
+      timestamp: Date.now(),
     };
-  }, [socket]);
+    setMessages([welcomeMessage]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,7 +36,7 @@ const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !socket) return;
 
     const message: Message = {
       id: Date.now().toString(),
@@ -43,7 +45,12 @@ const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
       timestamp: Date.now(),
     };
 
-    socket.emit('sendMessage', { gameId, message });
+    // Añadimos el mensaje a nuestra lista local
+    setMessages(prev => [...prev, message]);
+    
+    // Aquí podríamos implementar el envío del mensaje al servidor
+    // si quisiéramos añadir esa funcionalidad en el futuro
+    
     setNewMessage('');
   };
 
@@ -66,7 +73,9 @@ const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
               className={`inline-block p-2 rounded-lg ${
                 message.playerName === playerName
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200'
+                  : message.playerName === 'Sistema' 
+                    ? 'bg-green-100' 
+                    : 'bg-gray-200'
               }`}
             >
               <div className="font-bold text-sm">

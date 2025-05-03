@@ -1,10 +1,12 @@
 import type { GameState, Card, CardColor } from '../types/game';
+import type { Message } from '../components/Chat';
 
 export interface GameEvents {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onGameCreated?: (game: GameState) => void;
   onGameUpdated?: (game: GameState) => void;
+  onChatMessage?: (message: Message) => void;
 }
 
 export class GameClient {
