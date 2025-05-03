@@ -17,6 +17,10 @@ const GameTable: React.FC<GameTableProps> = ({
   onDrawCard,
   isCurrentPlayerTurn
 }) => {
+  if (!gameState || !currentPlayer) {
+    return null;
+  }
+
   return (
     <div className="relative w-full h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)] bg-green-800 shadow-inner">
       {/* Efecto de textura de fieltro */}
@@ -91,7 +95,7 @@ const GameTable: React.FC<GameTableProps> = ({
       {/* Información de otros jugadores */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-4 px-2 sm:px-4 flex-wrap">
         {gameState.players
-          .filter(p => p.id !== currentPlayer.id)
+          .filter(p => p && p.id && p.id !== currentPlayer.id)
           .map(player => (
             <motion.div
               key={player.id}
@@ -99,7 +103,7 @@ const GameTable: React.FC<GameTableProps> = ({
               animate={{ opacity: 1, y: 0 }}
               className={`
                 px-2 sm:px-4 py-1 sm:py-2 rounded-lg
-                ${gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === player.id) ? 'bg-yellow-500' : 'bg-gray-800'}
+                ${gameState.currentPlayerIndex === gameState.players.findIndex(p => p && p.id === player.id) ? 'bg-yellow-500' : 'bg-gray-800'}
                 text-white shadow-lg
               `}
             >

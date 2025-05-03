@@ -512,7 +512,7 @@ export default function Home() {
             )}
             
             {/* Juego en progreso */}
-            {gameState.status !== 'waiting' && (
+            {gameState.status !== 'waiting' && currentPlayer && (
               <>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -524,18 +524,16 @@ export default function Home() {
 
                 <GameTable
                   gameState={gameState}
-                  currentPlayer={currentPlayer!}
+                  currentPlayer={currentPlayer}
                   onDrawCard={drawCard}
                   isCurrentPlayerTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
                 />
 
-                {currentPlayer && (
-                  <PlayerHand
-                    cards={currentPlayer.cards}
-                    onCardClick={playCard}
-                    isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
-                  />
-                )}
+                <PlayerHand
+                  cards={currentPlayer.cards}
+                  onCardClick={playCard}
+                  isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
+                />
 
                 <Chat
                   playerName={playerName}
