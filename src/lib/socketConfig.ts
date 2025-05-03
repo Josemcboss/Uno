@@ -516,4 +516,34 @@ export class GameClient {
   set onChatMessage(callback: (message: Message) => void) {
     this.events.onChatMessage = callback;
   }
+
+  async addAIPlayer(gameId: string, aiName: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'add_ai_player',
+          gameId,
+          aiName
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error del servidor:', data);
+        return false;
+      }
+
+      if (data.game) {
+        this.events.onGameUpdated?.(data.game);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error adding AI player:', error);
+      return false;
+    }
+  }
 } 

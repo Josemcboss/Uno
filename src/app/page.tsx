@@ -10,6 +10,12 @@ import GameControls from '../components/GameControls';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameClient } from '../lib/socketConfig';
 import React from 'react';
+import GameTable from '../components/GameTable';
+import AIPlayerButton from '../components/AIPlayerButton';
+import { AIPlayer } from '../services/AIPlayer';
+import SoundEffects from '../services/SoundEffects';
+import Achievements from '../services/Achievements';
+import AchievementNotification from '../components/AchievementNotification';
 
 let gameClient: GameClient | null = null;
 
@@ -27,6 +33,8 @@ export default function Home() {
   const [showJoinOptions, setShowJoinOptions] = useState(false);
   const [createRoomName, setCreateRoomName] = useState('');
   const [isRoomPrivate, setIsRoomPrivate] = useState(false);
+  const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
+  const [winningStreak, setWinningStreak] = useState<number>(0);
 
   const currentPlayer = React.useMemo(() => 
     gameState?.players.find((p: Player) => p.id === playerId),
@@ -51,6 +59,11 @@ export default function Home() {
       setPlayerId(lastPlayerId);
     }
   }, [isConnected, isConnecting, gameState]);
+
+  useEffect(() => {
+    SoundEffects.initialize();
+    Achievements.initialize();
+  }, []);
 
   const initializeGame = async () => {
     if (!gameClient) {
@@ -177,6 +190,14 @@ export default function Home() {
     await gameClient.startGame(gameState.id);
   };
 
+  const handleAddAI = async () => {
+    if (!gameState || !gameClient) return;
+    
+    const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
+    await gameClient.addAIPlayer(gameState.id, aiName);
+    SoundEffects.play('gameStart');
+  };
+
   const playCard = async (card: CardType) => {
     if (!gameState || !playerId || !gameClient) return;
 
@@ -187,12 +208,20 @@ export default function Home() {
     }
 
     await gameClient.playCard(gameState.id, playerId, card);
+    SoundEffects.play('cardPlay');
+
+    // Verificar logros relacionados con cartas
+    if (card.type === 'wild' || card.type === 'wildDraw4') {
+      const achievement = Achievements.updateProgress('wild_cards', 1);
+      if (achievement) setUnlockedAchievement(achievement);
+    }
   };
 
   const handleColorSelect = async (color: CardColor) => {
     if (!selectedCard || !gameState || !gameClient) return;
 
     await gameClient.playCard(gameState.id, playerId, selectedCard, color);
+    SoundEffects.play('cardPlay');
     setShowColorSelector(false);
     setSelectedCard(null);
   };
@@ -200,6 +229,7 @@ export default function Home() {
   const drawCard = async () => {
     if (!gameState || !playerId || !gameClient) return;
     await gameClient.drawCard(gameState.id, playerId);
+    SoundEffects.play('cardDraw');
   };
   
   const fetchAvailableGames = async () => {
@@ -212,6 +242,30 @@ export default function Home() {
     setGameId(selectedGameId);
     setShowJoinOptions(false);
   };
+
+  useEffect(() => {
+    if (gameState?.status === 'finished') {
+      const isWinner = gameState.winner === playerId;
+      const hasAIPlayer = gameState.players.some(p => p.name.startsWith('IA-'));
+      
+      if (isWinner) {
+        SoundEffects.play('victory');
+        setWinningStreak(prev => prev + 1);
+      } else {
+        setWinningStreak(0);
+      }
+
+      const achievements = Achievements.checkGameEndAchievements(
+        isWinner,
+        hasAIPlayer,
+        winningStreak + 1
+      );
+
+      if (achievements.length > 0) {
+        setUnlockedAchievement(achievements[0]);
+      }
+    }
+  }, [gameState?.status, gameState?.winner, playerId, winningStreak]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-700 p-8">
@@ -371,10 +425,17 @@ export default function Home() {
                     <p className="text-sm text-black">Comparte este código para que otros jugadores se unan.</p>
                   </div>
                   
+                  {currentPlayer.isHost && gameState.players.length === 1 && (
+                    <AIPlayerButton
+                      onAddAI={handleAddAI}
+                      disabled={gameState.players.some(p => p.name.startsWith('IA-'))}
+                    />
+                  )}
+                  
                   {currentPlayer.isHost && (
                     <button
                       onClick={startGame}
-                      className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+                      className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors mt-4"
                       disabled={gameState.players.length < 2}
                     >
                       {gameState.players.length < 2 
@@ -389,60 +450,51 @@ export default function Home() {
             {/* Juego en progreso */}
             {gameState.status !== 'waiting' && (
               <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-white mb-4"
-            >
-              <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
-            </motion.div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-white mb-4"
+                >
+                  <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
+                </motion.div>
 
-            <div className="flex justify-center items-center my-8">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring' }}
-              >
-                {gameState.lastCard && <Card card={gameState.lastCard} />}
-              </motion.div>
-            </div>
-
-            {currentPlayer && (
-              <>
-                <PlayerHand
-                  cards={currentPlayer.cards}
-                  onCardClick={playCard}
-                  isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
+                <GameTable
+                  gameState={gameState}
+                  currentPlayer={currentPlayer}
+                  onDrawCard={drawCard}
+                  isCurrentPlayerTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
                 />
-                    
-                {gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId) && (
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={drawCard}
-                    className="fixed bottom-48 left-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors"
-                  >
-                    Robar Carta
-                  </motion.button>
-                )}
-              </>
-            )}
 
-            <Chat
-              playerName={playerName}
-              socket={gameClient}
-            />
-                
+                {currentPlayer && (
+                  <PlayerHand
+                    cards={currentPlayer.cards}
+                    onCardClick={playCard}
+                    isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === playerId)}
+                  />
+                )}
+
+                <Chat
+                  playerName={playerName}
+                  socket={gameClient}
+                />
+
                 <GameControls
                   game={gameState}
                   playerId={playerId}
                   socket={gameClient}
                 />
 
-            {showColorSelector && (
-              <ColorSelector onColorSelect={handleColorSelect} />
+                {showColorSelector && (
+                  <ColorSelector onColorSelect={handleColorSelect} />
                 )}
               </>
+            )}
+            
+            {unlockedAchievement && (
+              <AchievementNotification
+                achievement={unlockedAchievement}
+                onClose={() => setUnlockedAchievement(null)}
+              />
             )}
           </div>
         )}

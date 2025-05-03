@@ -3,10 +3,12 @@ import { Card as CardType } from '../types/game';
 import { 
   GiCardRandom, 
   GiCardDraw, 
-  GiCardJoker
+  GiCardJoker,
+  GiCardExchange,
+  GiCardPlay,
+  GiCardDiscard
 } from 'react-icons/gi';
-import { IoIosRefresh } from 'react-icons/io';
-import { FaBan } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
 interface CardProps {
   card: CardType;
@@ -20,9 +22,9 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false, size = '
     const iconSize = size === 'sm' ? 'text-2xl' : size === 'md' ? 'text-4xl' : 'text-5xl';
     switch (card.type) {
       case 'skip':
-        return <FaBan className={iconSize} />;
+        return <GiCardDiscard className={iconSize} />;
       case 'reverse':
-        return <IoIosRefresh className={iconSize} />;
+        return <GiCardExchange className={iconSize} />;
       case 'draw2':
         return <GiCardDraw className={iconSize} />;
       case 'wild':
@@ -30,7 +32,7 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false, size = '
       case 'wildDraw4':
         return <GiCardJoker className={iconSize} />;
       default:
-        return null;
+        return <GiCardPlay className={iconSize} />;
     }
   };
 
@@ -48,45 +50,69 @@ const Card: React.FC<CardProps> = ({ card, onClick, isPlayable = false, size = '
   };
 
   return (
-    <div
-      onClick={isPlayable ? onClick : undefined}
+    <motion.div
+      whileHover={isPlayable ? { scale: 1.1, y: -10 } : {}}
       className={`
-        ${sizeClasses[size]} rounded-xl shadow-lg flex items-center justify-center
-        font-bold text-white transform transition-transform
-        ${isPlayable ? 'hover:scale-110 cursor-pointer' : ''}
-        ${card.color === 'red' ? 'bg-red-600' : ''}
-        ${card.color === 'blue' ? 'bg-blue-600' : ''}
-        ${card.color === 'green' ? 'bg-green-600' : ''}
-        ${card.color === 'yellow' ? 'bg-yellow-500' : ''}
-        ${card.color === 'black' ? 'bg-gray-800' : ''}
-        relative overflow-hidden
+        ${sizeClasses[size]} rounded-xl shadow-xl
+        font-bold text-white transform
+        ${isPlayable ? 'cursor-pointer' : ''}
+        ${card.color === 'red' ? 'bg-gradient-to-br from-red-500 to-red-700' : ''}
+        ${card.color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700' : ''}
+        ${card.color === 'green' ? 'bg-gradient-to-br from-green-500 to-green-700' : ''}
+        ${card.color === 'yellow' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' : ''}
+        ${card.color === 'black' ? 'bg-gradient-to-br from-gray-700 to-gray-900' : ''}
+        relative overflow-hidden border-2 border-white
       `}
+      onClick={isPlayable ? onClick : undefined}
     >
+      {/* Esquinas superiores */}
+      <div className="absolute top-2 left-2 flex flex-col items-center">
+        <span className="text-sm font-bold">{getCardContent()}</span>
+        <div className="transform scale-50">{getCardIcon()}</div>
+      </div>
+
+      {/* Centro */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {card.type === 'number' ? (
+          <span className={`
+            ${size === 'sm' ? 'text-4xl' : size === 'md' ? 'text-6xl' : 'text-7xl'}
+            font-bold drop-shadow-lg
+          `}>
+            {card.value}
+          </span>
+        ) : (
+          <div className="flex flex-col items-center">
+            {getCardIcon()}
+            <span className="text-sm mt-2 font-bold">{card.type}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Esquinas inferiores */}
+      <div className="absolute bottom-2 right-2 flex flex-col items-center transform rotate-180">
+        <span className="text-sm font-bold">{getCardContent()}</span>
+        <div className="transform scale-50">{getCardIcon()}</div>
+      </div>
+
+      {/* Efecto de brillo */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white opacity-10" />
+      
       {/* Patrón de fondo */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 transform rotate-45 flex items-center justify-center">
-          {Array.from({ length: 5 }).map((_, i) => (
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0 transform rotate-45">
+          {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
-              className="w-full h-4 bg-white m-4"
+              className="absolute w-full h-1 bg-white"
               style={{
-                transform: `rotate(${i * 72}deg)`,
+                top: `${i * 20}%`,
+                transform: `rotate(${i * 36}deg)`,
               }}
             />
           ))}
         </div>
       </div>
-
-      {/* Contenido de la carta */}
-      <div className="relative z-10 flex flex-col items-center justify-center">
-        {getCardIcon()}
-        {card.type === 'number' && (
-          <span className={size === 'sm' ? 'text-2xl' : size === 'md' ? 'text-3xl' : 'text-4xl'}>
-            {getCardContent()}
-          </span>
-        )}
-      </div>
-    </div>
+    </motion.div>
   );
 };
 
