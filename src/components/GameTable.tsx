@@ -84,14 +84,35 @@ const GameTable: React.FC<GameTableProps> = ({
 
   return (
     <div className="relative w-full h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)]">
-      {/* Marco de madera */}
-      <div className="absolute inset-0 border-[20px] sm:border-[30px] rounded-lg" style={{
-        borderImage: 'url(/wood-texture.png) 30 30 stretch',
-        borderStyle: 'solid',
-      }} />
+      {/* Marco de madera con gradiente */}
+      <div className="absolute inset-0 rounded-lg" style={{
+        background: `
+          linear-gradient(45deg, 
+            #8B4513 0%,
+            #A0522D 25%,
+            #CD853F 50%,
+            #A0522D 75%,
+            #8B4513 100%
+          )`,
+        padding: '20px',
+        boxShadow: 'inset 0 0 15px rgba(0,0,0,0.5)'
+      }}>
+        {/* Textura de vetas de madera */}
+        <div className="absolute inset-0 opacity-30" style={{
+          background: `
+            repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 10px,
+              rgba(0,0,0,0.1) 10px,
+              rgba(0,0,0,0.1) 20px
+            )
+          `
+        }} />
+      </div>
       
       {/* Mesa de juego */}
-      <div className="absolute inset-[20px] sm:inset-[30px] bg-green-800 shadow-inner rounded-lg overflow-hidden">
+      <div className="absolute inset-[20px] bg-green-800 shadow-inner rounded-lg overflow-hidden">
         {/* Efecto de textura de fieltro */}
         <div className="absolute inset-0 bg-[url('/felt-texture.png')] opacity-20 mix-blend-multiply" />
         
