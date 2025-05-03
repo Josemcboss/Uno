@@ -71,6 +71,25 @@ export default function Home() {
     Achievements.initialize();
   }, []);
 
+  useEffect(() => {
+    if (gameState?.status !== 'waiting' && currentPlayer) {
+      console.log('Estado del juego:', {
+        gameState: gameState ? {
+          id: gameState.id,
+          status: gameState.status,
+          currentPlayerIndex: gameState.currentPlayerIndex,
+          playersCount: gameState.players.length
+        } : null,
+        currentPlayer: {
+          id: currentPlayer.id,
+          name: currentPlayer.name,
+          cardsCount: currentPlayer.cards.length
+        },
+        playerId
+      });
+    }
+  }, [gameState, currentPlayer, playerId]);
+
   const initializeGame = async () => {
     if (!gameClient) {
       setIsConnecting(true);
@@ -87,29 +106,31 @@ export default function Home() {
           setError('Se perdió la conexión con el servidor. Por favor, intenta reconectar.');
         },
         onGameCreated: (game: GameState) => {
+          console.log('Juego creado:', game.id);
           setGameState(game);
           setGameId(game.id);
-          // Guardar el ID de la partida y del jugador para futura reconexión
           localStorage.setItem('lastGameId', game.id);
           localStorage.setItem('lastPlayerId', game.players[0].id);
           setPlayerId(game.players[0].id);
         },
-        onGameUpdated: (game: GameState) => {
-          setGameState(game);
-        },
+        onGameUpdated: onGameUpdated,
         onRoomsUpdated: (rooms: Room[]) => {
           setAvailableGames(rooms);
         }
       });
 
-      try {
-      await gameClient.connect();
-      } catch (err) {
-        console.error('Error al inicializar:', err);
-        setIsConnecting(false);
-        setError('Error al conectar con el servidor. Por favor, intenta más tarde.');
-      }
+      initializeGame();
     }
+  };
+
+  const onGameUpdated = (updatedGame: GameState) => {
+    console.log('Actualizando estado del juego:', {
+      prevStatus: gameState?.status,
+      newStatus: updatedGame.status,
+      players: updatedGame.players.length
+    });
+    
+    setGameState(updatedGame);
   };
 
   const reconnect = async () => {
@@ -192,8 +213,26 @@ export default function Home() {
   };
   
   const startGame = async () => {
-    if (!gameState || !gameClient) return;
-    await gameClient.startGame(gameState.id);
+    if (!gameState || !gameClient) {
+      console.log('No se puede iniciar el juego: faltan datos necesarios', { gameState, gameClient });
+      return;
+    }
+
+    try {
+      console.log('Iniciando juego...', { gameId: gameState.id });
+      const success = await gameClient.startGame(gameState.id);
+      
+      if (!success) {
+        console.error('Error al iniciar el juego');
+        setError('No se pudo iniciar el juego. Por favor, intenta de nuevo.');
+      } else {
+        console.log('Juego iniciado exitosamente');
+        SoundEffects.play('gameStart');
+      }
+    } catch (err) {
+      console.error('Error al iniciar el juego:', err);
+      setError('Ocurrió un error al iniciar el juego.');
+    }
   };
 
   const handleAddAI = async () => {
@@ -512,7 +551,7 @@ export default function Home() {
             )}
             
             {/* Juego en progreso */}
-            {gameState.status !== 'waiting' && currentPlayer && (
+            {gameState?.status !== 'waiting' && currentPlayer && (
               <>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -520,6 +559,11 @@ export default function Home() {
                   className="text-white mb-4"
                 >
                   <h2 className="text-2xl font-bold">Juego #{gameState.id}</h2>
+                  {/* Indicador de estado para depuración */}
+                  <p className="text-sm opacity-50">
+                    Estado: {gameState.status} | 
+                    Jugador actual: {gameState.currentPlayerIndex + 1} de {gameState.players.length}
+                  </p>
                 </motion.div>
 
                 <GameTable
@@ -550,6 +594,25 @@ export default function Home() {
                   <ColorSelector onColorSelect={handleColorSelect} />
                 )}
               </>
+            )}
+            
+            {/* Pantalla de carga o error */}
+            {gameState && !currentPlayer && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full">
+                  <h2 className="text-2xl font-bold mb-4 text-center text-black">Cargando partida...</h2>
+                  <p className="text-gray-600 text-center">
+                    Si esto tarda demasiado, puede que hayas perdido la conexión.
+                    Intenta recargar la página.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="mt-4 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+                  >
+                    Recargar página
+                  </button>
+                </div>
+              </div>
             )}
             
             {unlockedAchievement && (
