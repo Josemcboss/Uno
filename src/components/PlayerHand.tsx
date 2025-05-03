@@ -17,10 +17,10 @@ const PlayerHand: React.FC<PlayerHandProps> = ({ cards, onCardClick, isCurrentTu
   useEffect(() => {
     if (width < 640) { // móvil
       setCardSize('sm');
-      setOverlap(-32);
+      setOverlap(-24);
     } else if (width < 1024) { // tablet
       setCardSize('md');
-      setOverlap(-48);
+      setOverlap(-40);
     } else { // desktop
       setCardSize('lg');
       setOverlap(-64);
@@ -28,17 +28,23 @@ const PlayerHand: React.FC<PlayerHandProps> = ({ cards, onCardClick, isCurrentTu
   }, [width]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-800 bg-opacity-50">
+    <div className="fixed bottom-0 left-0 right-0 p-2 sm:p-4 bg-gray-800 bg-opacity-50">
       <div 
-        className="flex justify-center items-end overflow-x-auto pb-4 px-4 md:px-8 lg:px-12"
+        className="flex justify-center items-end overflow-x-auto pb-2 sm:pb-4 px-2 sm:px-8"
         style={{
-          minHeight: cardSize === 'sm' ? '96px' : cardSize === 'md' ? '144px' : '192px'
+          minHeight: cardSize === 'sm' ? '80px' : cardSize === 'md' ? '120px' : '192px',
+          touchAction: 'pan-x',
+          WebkitOverflowScrolling: 'touch'
         }}
       >
         {cards.map((card, index) => (
           <div 
             key={card.id} 
-            className="transition-transform hover:translate-y-[-20px]"
+            className={`
+              transition-transform duration-200
+              ${isCurrentTurn ? 'hover:translate-y-[-10px] active:translate-y-[-5px]' : ''}
+              touch-manipulation
+            `}
             style={{ 
               marginRight: index === cards.length - 1 ? 0 : `${overlap}px`,
               zIndex: index
@@ -46,7 +52,7 @@ const PlayerHand: React.FC<PlayerHandProps> = ({ cards, onCardClick, isCurrentTu
           >
             <Card
               card={card}
-              onClick={() => onCardClick?.(card)}
+              onClick={() => isCurrentTurn && onCardClick?.(card)}
               isPlayable={isCurrentTurn}
               size={cardSize}
             />
