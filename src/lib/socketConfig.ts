@@ -497,7 +497,6 @@ export class GameClient {
         })
       });
 
-      const data = await response.json();
       return response.ok;
     } catch (error) {
       return false;
