@@ -3,7 +3,7 @@ import { createGame, dealInitialCards, drawCard, playCard } from '../../../lib/g
 import { getGame, setGame } from '../../../lib/redis';
 
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const preferredRegion = 'cdg1';
 
 export async function GET(req: Request) {
   try {
@@ -13,7 +13,12 @@ export async function GET(req: Request) {
     if (!gameId) {
       return new NextResponse(
         JSON.stringify({ message: 'Conexión establecida' }),
-        { status: 200 }
+        { 
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
     }
 
@@ -24,6 +29,7 @@ export async function GET(req: Request) {
         { 
           status: 200,
           headers: {
+            'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
@@ -34,13 +40,23 @@ export async function GET(req: Request) {
 
     return new NextResponse(
       JSON.stringify({ message: 'Game not found' }),
-      { status: 404 }
+      { 
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     );
   } catch (error) {
     console.error('Error in GET handler:', error);
     return new NextResponse(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     );
   }
 }
