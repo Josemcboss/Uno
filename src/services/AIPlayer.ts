@@ -2,75 +2,86 @@ import { Card, GameState, Player, CardColor } from '../types/game';
 import { GameClient } from '../lib/socketConfig';
 
 export class AIPlayer {
-  private static readonly DELAY = 1500; // Aumentado el tiempo de "pensamiento" para mejor experiencia
+  private static readonly DELAY = 800; // Reducido de 1500 a 800ms
 
   static async playTurn(gameState: GameState, aiPlayer: Player, gameClient: GameClient): Promise<void> {
-    console.log('IA iniciando turno:', {
-      aiName: aiPlayer.name,
-      cardsCount: aiPlayer.cards.length,
-      topCard: gameState.discardPile[gameState.discardPile.length - 1]
-    });
+    try {
+      console.log('IA iniciando turno:', {
+        aiName: aiPlayer.name,
+        cardsCount: aiPlayer.cards.length,
+        topCard: gameState.discardPile[gameState.discardPile.length - 1]
+      });
 
-    await new Promise(resolve => setTimeout(resolve, this.DELAY));
-
-    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-    const playableCards = aiPlayer.cards.filter(card => 
-      this.canPlayCard(card, topCard)
-    );
-
-    console.log('Cartas jugables de la IA:', {
-      total: aiPlayer.cards.length,
-      playable: playableCards.length,
-      cards: playableCards.map(c => `${c.color || 'black'} ${c.type}${c.value !== undefined ? ' ' + c.value : ''}`)
-    });
-
-    if (playableCards.length === 0) {
-      console.log('IA necesita robar carta');
-      // Si no hay cartas jugables, robar y verificar si la carta robada se puede jugar
-      await gameClient.drawCard(gameState.id, aiPlayer.id);
-      
-      // Esperar un momento para que se actualice el estado del juego
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verificar si la última carta robada se puede jugar
-      const lastDrawnCard = aiPlayer.cards[aiPlayer.cards.length - 1];
-      if (lastDrawnCard && this.canPlayCard(lastDrawnCard, topCard)) {
-        console.log('IA puede jugar la carta robada:', {
-          card: `${lastDrawnCard.color || 'black'} ${lastDrawnCard.type}${lastDrawnCard.value !== undefined ? ' ' + lastDrawnCard.value : ''}`
-        });
-        // Si la carta robada se puede jugar, jugarla
-        if (lastDrawnCard.type === 'wild' || lastDrawnCard.type === 'wildDraw4') {
-          const color = this.getMostFrequentColor(aiPlayer.cards);
-          console.log('IA eligiendo color para carta wild:', color);
-          await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard, color);
-        } else {
-          await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard);
-        }
-      } else {
-        console.log('IA no puede jugar la carta robada');
+      // Verificar que sea realmente el turno de la IA
+      const currentPlayerIndex = gameState.players.findIndex(p => p.id === aiPlayer.id);
+      if (currentPlayerIndex !== gameState.currentPlayerIndex) {
+        console.log('No es el turno de la IA');
+        return;
       }
-      return;
-    }
 
-    // Elegir la mejor carta para jugar
-    const cardToPlay = this.chooseBestCard(playableCards, aiPlayer.cards);
-    console.log('IA eligió jugar:', {
-      card: `${cardToPlay.color || 'black'} ${cardToPlay.type}${cardToPlay.value !== undefined ? ' ' + cardToPlay.value : ''}`
-    });
-    
-    // Si es una carta wild, elegir el color más frecuente
-    if (cardToPlay.type === 'wild' || cardToPlay.type === 'wildDraw4') {
-      const color = this.getMostFrequentColor(aiPlayer.cards);
-      console.log('IA eligiendo color para carta wild:', color);
-      await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay, color);
-    } else {
-      await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay);
-    }
+      await new Promise(resolve => setTimeout(resolve, this.DELAY));
 
-    // Llamar UNO si corresponde
-    if (aiPlayer.cards.length === 2) {
-      console.log('IA llamando UNO');
-      await gameClient.callUno(gameState.id, aiPlayer.id);
+      const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+      const playableCards = aiPlayer.cards.filter(card => 
+        this.canPlayCard(card, topCard)
+      );
+
+      console.log('Cartas jugables de la IA:', {
+        total: aiPlayer.cards.length,
+        playable: playableCards.length,
+        cards: playableCards.map(c => `${c.color || 'black'} ${c.type}${c.value !== undefined ? ' ' + c.value : ''}`)
+      });
+
+      if (playableCards.length === 0) {
+        console.log('IA necesita robar carta');
+        await gameClient.drawCard(gameState.id, aiPlayer.id);
+        
+        // Esperar un momento para que se actualice el estado del juego
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verificar si la carta robada se puede jugar
+        const updatedGameState = await gameClient.getGameState(gameState.id);
+        if (!updatedGameState) return;
+
+        const updatedAIPlayer = updatedGameState.players.find((p: Player) => p.id === aiPlayer.id);
+        if (!updatedAIPlayer) return;
+
+        const lastDrawnCard = updatedAIPlayer.cards[updatedAIPlayer.cards.length - 1];
+        if (lastDrawnCard && this.canPlayCard(lastDrawnCard, topCard)) {
+          // Si la carta robada se puede jugar, jugarla después de una pequeña pausa
+          await new Promise(resolve => setTimeout(resolve, 300));
+          if (lastDrawnCard.type === 'wild' || lastDrawnCard.type === 'wildDraw4') {
+            const color = this.getMostFrequentColor(updatedAIPlayer.cards);
+            await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard, color);
+          } else {
+            await gameClient.playCard(gameState.id, aiPlayer.id, lastDrawnCard);
+          }
+        }
+        return;
+      }
+
+      // Elegir la mejor carta para jugar
+      const cardToPlay = this.chooseBestCard(playableCards, aiPlayer.cards);
+      console.log('IA eligió jugar:', {
+        card: `${cardToPlay.color || 'black'} ${cardToPlay.type}${cardToPlay.value !== undefined ? ' ' + cardToPlay.value : ''}`
+      });
+      
+      // Si es una carta wild, elegir el color más frecuente
+      if (cardToPlay.type === 'wild' || cardToPlay.type === 'wildDraw4') {
+        const color = this.getMostFrequentColor(aiPlayer.cards);
+        console.log('IA eligiendo color para carta wild:', color);
+        await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay, color);
+      } else {
+        await gameClient.playCard(gameState.id, aiPlayer.id, cardToPlay);
+      }
+
+      // Llamar UNO si corresponde
+      if (aiPlayer.cards.length === 2) {
+        console.log('IA llamando UNO');
+        await gameClient.callUno(gameState.id, aiPlayer.id);
+      }
+    } catch (error) {
+      console.error('Error en el turno de la IA:', error);
     }
   }
 

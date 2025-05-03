@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameState, Player } from '../types/game';
 import Card from './Card';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GiCardDraw } from 'react-icons/gi';
 import OpponentHand from './OpponentHand';
 
@@ -127,53 +127,64 @@ const GameTable: React.FC<GameTableProps> = ({
           `}
           onClick={isCurrentPlayerTurn ? onDrawCard : undefined}
         >
-          <div className="relative">
+          <AnimatePresence mode="popLayout">
             {/* Cartas apiladas del mazo */}
             {[...Array(Math.min(3, gameState.deck.length))].map((_, i) => (
-              <div
+              <motion.div
                 key={i}
-                className="absolute"
-                style={{
-                  transform: `translateX(${i * -1}px)`,
-                  zIndex: i,
+                initial={{ x: 200, opacity: 0 }}
+                animate={{ 
+                  x: i * -1,
+                  opacity: 1,
+                  transition: { delay: i * 0.1 }
                 }}
+                exit={{ x: -200, opacity: 0 }}
+                className="absolute"
+                style={{ zIndex: i }}
               >
                 <div className="w-16 h-24 sm:w-20 sm:h-28 rounded-lg bg-blue-900 border-2 border-white shadow-lg rotate-90">
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="text-white transform -rotate-90 text-lg sm:text-xl font-bold">UNO</div>
                   </div>
                 </div>
-              </div>
-            ))}
-            
-            {isCurrentPlayerTurn && (
-              <motion.div
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-2"
-              >
-                <GiCardDraw className="text-xl sm:text-2xl text-white" />
               </motion.div>
-            )}
-          </div>
+            ))}
+          </AnimatePresence>
+          
+          {isCurrentPlayerTurn && (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-2"
+            >
+              <GiCardDraw className="text-xl sm:text-2xl text-white" />
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Área central de la mesa */}
         <div className="absolute inset-0 flex items-center justify-center">
           {/* Pila de descarte */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="relative"
-          >
+          <AnimatePresence mode="popLayout">
             {gameState.discardPile.slice(-3).map((card, i, arr) => (
-              <div
+              <motion.div
                 key={card.id}
-                className="absolute"
-                style={{
-                  transform: `rotate(${(i - 1) * 5}deg)`,
-                  zIndex: i,
+                initial={{ scale: 0, rotate: 0 }}
+                animate={{ 
+                  scale: 1,
+                  rotate: (i - 1) * 5,
+                  transition: {
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 20
+                  }
                 }}
+                exit={{ 
+                  scale: 0,
+                  transition: { duration: 0.2 }
+                }}
+                className="absolute"
+                style={{ zIndex: i }}
               >
                 <Card 
                   card={card} 
@@ -182,26 +193,32 @@ const GameTable: React.FC<GameTableProps> = ({
                     (window.innerWidth < 640 ? "sm" : "md")
                   } 
                 />
-              </div>
+              </motion.div>
             ))}
-          </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Manos de los oponentes */}
-        {gameState.players
-          .filter(player => player.id !== currentPlayer.id)
-          .map((player, index) => (
-            <OpponentHand
+        <AnimatePresence>
+          {otherPlayers.map((player, index) => (
+            <motion.div
               key={player.id}
-              cardCount={player.cards.length}
-              playerName={player.name}
-              isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === player.id)}
-              position={getOpponentPosition(
-                gameState.players.findIndex(p => p.id === player.id),
-                gameState.players.length
-              )}
-            />
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+            >
+              <OpponentHand
+                cardCount={player.cards.length}
+                playerName={player.name}
+                isCurrentTurn={gameState.currentPlayerIndex === gameState.players.findIndex(p => p.id === player.id)}
+                position={getOpponentPosition(
+                  gameState.players.findIndex(p => p.id === player.id),
+                  gameState.players.length
+                )}
+              />
+            </motion.div>
           ))}
+        </AnimatePresence>
       </div>
     </div>
   );

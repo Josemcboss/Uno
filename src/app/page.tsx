@@ -50,7 +50,7 @@ export default function Home() {
   // Efecto para manejar el turno de la IA
   useEffect(() => {
     const handleAITurn = async () => {
-      if (!gameState || !gameClient) return;
+      if (!gameState || !gameClient || gameState.status !== 'playing') return;
 
       const currentPlayer = gameState.players[gameState.currentPlayerIndex];
       if (!currentPlayer) return;
@@ -61,7 +61,7 @@ export default function Home() {
         
         try {
           // Pequeña pausa para simular "pensamiento"
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Ejecutar el turno de la IA
           await AIPlayer.playTurn(gameState, currentPlayer, gameClient);
@@ -71,9 +71,9 @@ export default function Home() {
       }
     };
 
-    // Llamar a handleAITurn cuando cambie el jugador actual
+    // Llamar a handleAITurn cuando cambie el jugador actual o el estado del juego
     handleAITurn();
-  }, [gameState?.currentPlayerIndex]);
+  }, [gameState?.currentPlayerIndex, gameState?.status, gameState?.players, gameClient]);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -279,31 +279,16 @@ export default function Home() {
   };
 
   const handleAddAI = async () => {
-    if (!gameState || !gameClient) {
-      console.error('No se puede añadir IA: falta gameState o gameClient');
-      return false;
-    }
+    if (!gameClient || !gameState) return false;
     
-    try {
-      console.log('Intentando añadir IA a la partida:', gameState.id);
-      const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
-      
-      const success = await gameClient.addAIPlayer(gameState.id, aiName);
-      
-      if (success) {
-        console.log('IA añadida exitosamente:', aiName);
-        SoundEffects.play('gameStart');
-        return true;
-      } else {
-        console.error('Error al añadir IA: respuesta del servidor no exitosa');
-        setError('No se pudo añadir el jugador IA');
-        return false;
-      }
-    } catch (err) {
-      console.error('Error al añadir IA:', err);
+    const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
+    console.log('Añadiendo jugador IA:', aiName);
+    
+    const success = await gameClient.addAIPlayer(gameState.id, aiName);
+    if (!success) {
       setError('Error al añadir el jugador IA');
-      return false;
     }
+    return success;
   };
 
   const playCard = async (card: CardType) => {

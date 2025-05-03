@@ -576,4 +576,32 @@ export class GameClient {
       return false;
     }
   }
+
+  async getGameState(gameId: string): Promise<GameState | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        body: JSON.stringify({ 
+          action: 'get_game_state',
+          gameId
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error al obtener estado del juego:', data);
+        return null;
+      }
+
+      return data.game || null;
+    } catch (error) {
+      console.error('Error al obtener estado del juego:', error);
+      return null;
+    }
+  }
 } 
