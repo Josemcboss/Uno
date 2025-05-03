@@ -41,23 +41,33 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!isConnected && !isConnecting) {
-      initializeGame();
+    const checkConnection = async () => {
+      if (!isConnected && !isConnecting) {
+        await initializeGame();
+      }
+      // Cargar el nombre del jugador del localStorage
+      const savedName = localStorage.getItem('playerName');
+      if (savedName) {
+        setPlayerName(savedName);
+      }
+      
+      // Intentar reconectar a la última partida
+      const lastGameId = localStorage.getItem('lastGameId');
+      const lastPlayerId = localStorage.getItem('lastPlayerId');
+      if (lastGameId && lastPlayerId && !gameState) {
+        setGameId(lastGameId);
+        setPlayerId(lastPlayerId);
+      }
+    };
+
+    checkConnection();
+  }, [isConnected, isConnecting, gameState]);
+
+  useEffect(() => {
+    if (gameState?.players) {
+      // Lógica específica para los jugadores si es necesaria
     }
-    // Cargar el nombre del jugador del localStorage
-    const savedName = localStorage.getItem('playerName');
-    if (savedName) {
-      setPlayerName(savedName);
-    }
-    
-    // Intentar reconectar a la última partida
-    const lastGameId = localStorage.getItem('lastGameId');
-    const lastPlayerId = localStorage.getItem('lastPlayerId');
-    if (lastGameId && lastPlayerId && !gameState) {
-      setGameId(lastGameId);
-      setPlayerId(lastPlayerId);
-    }
-  }, [isConnected, isConnecting, gameState, gameState?.players]);
+  }, [gameState?.players]);
 
   useEffect(() => {
     SoundEffects.initialize();
@@ -193,8 +203,11 @@ export default function Home() {
     if (!gameState || !gameClient) return;
     
     const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
-    await gameClient.addAIPlayer(gameState.id, aiName);
-    SoundEffects.play('gameStart');
+    const success = await gameClient.addAIPlayer(gameState.id, aiName);
+    
+    if (success) {
+      SoundEffects.play('gameStart');
+    }
   };
 
   const playCard = async (card: CardType) => {
