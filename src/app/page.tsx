@@ -236,13 +236,30 @@ export default function Home() {
   };
 
   const handleAddAI = async () => {
-    if (!gameState || !gameClient) return;
+    if (!gameState || !gameClient) {
+      console.error('No se puede añadir IA: falta gameState o gameClient');
+      return false;
+    }
     
-    const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
-    const success = await gameClient.addAIPlayer(gameState.id, aiName);
-    
-    if (success) {
-      SoundEffects.play('gameStart');
+    try {
+      console.log('Intentando añadir IA a la partida:', gameState.id);
+      const aiName = `IA-${Math.floor(Math.random() * 1000)}`;
+      
+      const success = await gameClient.addAIPlayer(gameState.id, aiName);
+      
+      if (success) {
+        console.log('IA añadida exitosamente:', aiName);
+        SoundEffects.play('gameStart');
+        return true;
+      } else {
+        console.error('Error al añadir IA: respuesta del servidor no exitosa');
+        setError('No se pudo añadir el jugador IA');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error al añadir IA:', err);
+      setError('Error al añadir el jugador IA');
+      return false;
     }
   };
 
@@ -518,6 +535,7 @@ export default function Home() {
                         <span className={player.isHost ? "font-bold text-black" : "text-black"}>
                           {player.name} {player.isHost && "(Anfitrión)"}
                           {player.id === playerId && " (Tú)"}
+                          {player.name.startsWith('IA-') && " 🤖"}
                         </span>
                       </li>
                     ))}
@@ -528,23 +546,30 @@ export default function Home() {
                     <p className="text-sm text-black">Comparte este código para que otros jugadores se unan.</p>
                   </div>
                   
-                  {currentPlayer.isHost && gameState.players.length === 1 && (
-                    <AIPlayerButton
-                      onAddAI={handleAddAI}
-                      disabled={gameState.players.some(p => p.name.startsWith('IA-'))}
-                    />
-                  )}
-                  
                   {currentPlayer.isHost && (
-                    <button
-                      onClick={startGame}
-                      className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors mt-4"
-                      disabled={gameState.players.length < 2}
-                    >
-                      {gameState.players.length < 2 
-                        ? "Esperando más jugadores..." 
-                        : "Iniciar partida"}
-                    </button>
+                    <div className="space-y-4">
+                      {gameState.players.length === 1 && (
+                        <AIPlayerButton
+                          onAddAI={handleAddAI}
+                          disabled={gameState.players.some(p => p.name.startsWith('IA-'))}
+                        />
+                      )}
+                      
+                      <button
+                        onClick={startGame}
+                        className={`
+                          w-full p-2 rounded transition-colors
+                          ${gameState.players.length < 2 
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'}
+                        `}
+                        disabled={gameState.players.length < 2}
+                      >
+                        {gameState.players.length < 2 
+                          ? "Esperando más jugadores..." 
+                          : "Iniciar partida"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

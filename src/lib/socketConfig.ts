@@ -529,9 +529,13 @@ export class GameClient {
 
   async addAIPlayer(gameId: string, aiName: string): Promise<boolean> {
     try {
+      console.log('Enviando solicitud para añadir IA:', { gameId, aiName });
       const response = await fetch(`${this.baseUrl}/socket`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
         body: JSON.stringify({ 
           action: 'add_ai_player',
           gameId,
@@ -542,17 +546,20 @@ export class GameClient {
       const data = await response.json();
       
       if (!response.ok) {
-        console.error('Error del servidor:', data);
+        console.error('Error del servidor al añadir IA:', data);
         return false;
       }
 
       if (data.game) {
+        console.log('IA añadida exitosamente, actualizando estado del juego');
         this.events.onGameUpdated?.(data.game);
         return true;
       }
+      
+      console.error('Respuesta del servidor no contiene datos del juego');
       return false;
     } catch (error) {
-      console.error('Error adding AI player:', error);
+      console.error('Error al añadir jugador IA:', error);
       return false;
     }
   }
