@@ -92,7 +92,7 @@ const GameTable: React.FC<GameTableProps> = ({
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-4 px-2 sm:px-4 flex-wrap">
         {gameState.players
           .filter(p => p.id !== currentPlayer.id)
-          .map((player, index) => (
+          .map(player => (
             <motion.div
               key={player.id}
               initial={{ opacity: 0, y: -20 }}

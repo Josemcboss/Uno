@@ -1,6 +1,6 @@
 export interface Message {
   id: string;
   playerName: string;
-  text: string;
+  content: string;
   timestamp: number;
 } 
