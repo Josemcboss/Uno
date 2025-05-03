@@ -9,26 +9,23 @@ export interface Message {
 }
 
 interface ChatProps {
-  gameId: string;
   playerName: string;
   socket: GameClient | null;
 }
 
-const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
+const Chat: React.FC<ChatProps> = ({ playerName, socket }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Simular recepción de un mensaje de bienvenida al inicio
-    const welcomeMessage: Message = {
-      id: Date.now().toString(),
-      playerName: 'Sistema',
-      text: '¡Bienvenido al chat del juego!',
-      timestamp: Date.now(),
-    };
-    setMessages([welcomeMessage]);
-  }, []);
+    if (socket) {
+      // Escuchar mensajes del servidor
+      socket.onChatMessage = (message: Message) => {
+        setMessages(prev => [...prev, message]);
+      };
+    }
+  }, [socket]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,12 +42,8 @@ const Chat: React.FC<ChatProps> = ({ gameId, playerName, socket }) => {
       timestamp: Date.now(),
     };
 
-    // Añadimos el mensaje a nuestra lista local
-    setMessages(prev => [...prev, message]);
-    
-    // Aquí podríamos implementar el envío del mensaje al servidor
-    // si quisiéramos añadir esa funcionalidad en el futuro
-    
+    // Enviar mensaje al servidor
+    socket.sendChatMessage(message);
     setNewMessage('');
   };
 

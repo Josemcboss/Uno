@@ -67,6 +67,7 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
         {/* Turno actual */}
         <p className="text-sm text-black">
           Turno de: <span className="font-bold">{game.players[game.currentPlayerIndex]?.name || "?"}</span>
+          {isMyTurn && <span className="ml-2 text-green-600">(Es tu turno)</span>}
         </p>
         
         {/* Dirección */}
@@ -75,8 +76,8 @@ const GameControls: React.FC<GameControlsProps> = ({ game, playerId, socket }) =
         </p>
       </div>
       
-      {/* Controles de UNO */}
-      {hasOneCard && !hasCalledUno && (
+      {/* Controles de UNO - solo visible en tu turno */}
+      {isMyTurn && hasOneCard && !hasCalledUno && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={handleCallUno}

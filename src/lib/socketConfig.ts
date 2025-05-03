@@ -498,4 +498,33 @@ export class GameClient {
     this.currentGameId = null;
     this.events.onDisconnect?.();
   }
+
+  async sendChatMessage(message: Message): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/socket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'chat_message',
+          message
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error enviando mensaje:', data);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      return false;
+    }
+  }
+
+  set onChatMessage(callback: (message: Message) => void) {
+    this.events.onChatMessage = callback;
+  }
 } 

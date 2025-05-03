@@ -429,7 +429,6 @@ export default function Home() {
                 )}
 
                 <Chat
-                  gameId={gameState.id}
                   playerName={playerName}
                   socket={gameClient}
                 />

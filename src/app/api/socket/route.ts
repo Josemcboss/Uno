@@ -105,7 +105,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const data = await req.json();
-    const { action, gameId, playerId, playerName, cardId, newColor, roomId, roomName, isPrivate, maxPlayers, reportedById } = data;
+    const { action, gameId, playerId, playerName, cardId, newColor, roomId, roomName, isPrivate, maxPlayers, reportedById, message } = data;
 
     switch (action) {
       // --- Gestión de salas ---
@@ -373,6 +373,19 @@ export async function POST(req: Request) {
         await setGame(gameId, gameAfterReconnect);
         return new NextResponse(
           JSON.stringify({ game: gameAfterReconnect }),
+          { status: 200 }
+        );
+
+      case 'chat_message':
+        if (!message) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Missing message' }),
+            { status: 400 }
+          );
+        }
+        // Enviar el mensaje a todos los jugadores
+        return new NextResponse(
+          JSON.stringify({ message }),
           { status: 200 }
         );
 
